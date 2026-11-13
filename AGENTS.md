@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Founder Radar architecture
+- Server logic lives in `src/lib/*.functions.ts` (startScan, advanceScan, data reads) and `src/lib/*.server.ts` (callAI, db clients) — these are the files to replace via GitHub; they keep one-step-per-call scans within worker time limits.
+- All tables are read-only to the public (SELECT policies); writes happen only in server functions via the service-role client.
+- Pages read from the database only, never hardcoded data; the sample scan is flagged `is_sample = true` and shows a banner.

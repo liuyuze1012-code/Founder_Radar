@@ -71,7 +71,7 @@ export const advanceScan = createServerFn({ method: "POST" })
     let idx = PIPELINE.findIndex((p) => p.stage === scan.stage);
     if (idx < 0) idx = 0;
     if (scan.status === "running") idx = Math.min(idx + 1, PIPELINE.length - 1);
-    const step = PIPELINE[idx];
+    const step = PIPELINE[idx] ?? PIPELINE[0]!;
     const nextCounts = step.count != null ? { ...counts, [step.stage]: step.count } : counts;
     const done = step.stage === "done";
     await supabaseAdmin
