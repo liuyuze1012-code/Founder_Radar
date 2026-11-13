@@ -8,6 +8,13 @@
       "when": 1794584232437,
       "tag": "0000_founder_radar_schema_and_sample",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794595766222,
+      "tag": "0001_remove_public_read_policies",
+      "breakpoints": true
     }
   ]
 }

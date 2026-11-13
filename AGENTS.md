@@ -32,7 +32,7 @@ use the editor.
 ## Founder Radar architecture
 - Scan setup and startScan share a browser-safe input schema so invalid settings produce actionable errors before any scan is saved.
 - Server logic lives in `src/lib/*.functions.ts` (startScan, advanceScan, data reads) and `src/lib/*.server.ts` (callAI, db clients) — these are the files to replace via GitHub; they keep one-step-per-call scans within worker time limits.
-- All tables are read-only to the public (SELECT policies); writes happen only in server functions via the service-role client.
+- Tables have no public RLS policies; all reads and writes go through server functions using the service-role client (publicDb in db.server.ts).
 - Pages read from the database only, never hardcoded data; the sample scan is flagged `is_sample = true` and shows a banner.
 - Report card summaries are presentation-only: derive ideas from linked items.summary (paper/grant abstracts or repository README), use cases.product only as fallback, and qualifications from picks.why; validate seven- or eight-word rewrites, cache by source content, fall back to saved source titles on rewrite failure, and never alter sourcing, scoring, or saved startup cases.
 - Researcher score evidence uses native details/summary disclosures to stay collapsed by default without a newly optimized React dependency that can conflict with already-open preview sessions.
