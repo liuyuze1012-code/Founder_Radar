@@ -6,18 +6,14 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
     <div
-      className="flex min-h-screen items-center justify-center"
+      className="flex min-h-screen flex-col items-center justify-center gap-3 text-center"
       style={{ backgroundColor: "#fcfbf8" }}
     >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+      <h1 className="text-4xl font-bold text-slate-900">Founder Radar</h1>
+      <p className="text-slate-600">Sync test: this text was pushed from Claude Code via GitHub.</p>
     </div>
   );
 }
