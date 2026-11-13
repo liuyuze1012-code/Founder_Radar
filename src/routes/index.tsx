@@ -1,124 +1,237 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
-import { getDigest } from "@/lib/data.functions";
-import { LANES } from "@/lib/radar";
-import { FounderCard, SampleBanner, laneUi } from "@/components/radar/bits";
+import { Card } from "@heroui/react";
+import { ArrowRight, FileText, RefreshCw, ScanSearch } from "lucide-react";
+import { getDashboard } from "@/lib/data.functions";
+import { LANES, regionCodes, regionNames } from "@/lib/radar";
+import { useTracked } from "@/lib/tracking";
+import { SampleBanner, Tag, laneUi } from "@/components/radar/bits";
 
-const digestQuery = queryOptions({ queryKey: ["digest"], queryFn: () => getDigest() });
+const dashboardQuery = queryOptions({ queryKey: ["dashboard"], queryFn: () => getDashboard() });
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Digest — Founder Radar" },
-      { name: "description", content: "This week's researchers worth getting to know, by lane." },
-      { property: "og:title", content: "Digest — Founder Radar" },
+      { title: "Dashboard — Founder Radar" },
+      {
+        name: "description",
+        content: "Every thesis you track, every scan you have run, and everyone sourced.",
+      },
+      { property: "og:title", content: "Dashboard — Founder Radar" },
       {
         property: "og:description",
-        content: "This week's researchers worth getting to know, by lane.",
+        content: "Every thesis you track, every scan you have run, and everyone sourced.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(digestQuery),
-  component: Digest,
+  loader: ({ context }) => context.queryClient.ensureQueryData(dashboardQuery),
+  component: Dashboard,
 });
 
-/** The scan's funnel, from records collected down to people who cleared the bar. */
-function Funnel({ counts }: { counts: Record<string, number> }) {
-  const steps = [
-    [counts["collect"], "records collected"],
-    [counts["screen"], "passed screening"],
-    [counts["resolve"], "people identified"],
-    [counts["score"], "cleared the bar"],
-  ].filter(([n]) => n != null) as [number, string][];
-  if (!steps.length) return null;
+type Scan = Awaited<ReturnType<typeof getDashboard>>["scans"][number];
+type ThesisRow = { text: string; school_ids: string[] } | null;
+
+const thesisOf = (s: Scan) => s.theses as ThesisRow;
+const whenOf = (s: Scan) => s.finished_at ?? s.started_at ?? "";
+const shortDate = (iso: string) =>
+  new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+function LaneCounts({ lanes }: { lanes: Scan["lanes"] }) {
   return (
-    <div className="mt-5 flex flex-wrap items-center gap-x-1 gap-y-2">
-      {steps.map(([n, label], i) => (
-        <div key={label} className="flex items-center gap-1">
-          {i > 0 && <ChevronRight className="size-4 text-muted" />}
-          <span className="rounded-full bg-surface px-3 py-1 text-sm shadow-sm">
-            <span className="font-semibold tabular-nums">{n}</span>{" "}
-            <span className="text-muted">{label}</span>
-          </span>
-        </div>
+    <div className="flex items-center gap-3">
+      {LANES.map((l) => (
+        <span key={l.key} className="inline-flex items-center gap-1.5 text-sm" title={l.title}>
+          <span className={`size-2 rounded-full ${laneUi(l.key).dot}`} />
+          <span className="font-semibold tabular-nums">{lanes[l.key]}</span>
+        </span>
       ))}
     </div>
   );
 }
 
-function Digest() {
-  const { data } = useSuspenseQuery(digestQuery);
-  if (!data.scan) {
-    return (
-      <div className="py-24 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">No finished scans yet</h1>
-        <p className="mt-2 text-muted">Run a scan to see your digest.</p>
-        <Link
-          to="/setup"
-          className="mt-6 inline-flex rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground"
-        >
-          Start a scan
-        </Link>
-      </div>
-    );
+function StatusTag({ scan }: { scan: Scan }) {
+  if (scan.status === "done") return null;
+  return <Tag>{scan.status === "failed" ? "Stopped early" : "In progress"}</Tag>;
+}
+
+function Dashboard() {
+  const { data } = useSuspenseQuery(dashboardQuery);
+  const tracked = Object.keys(useTracked()).length;
+  const real = data.scans.filter((s) => !s.is_sample);
+  const scans = real.length ? real : data.scans;
+  const reports = scans.filter((s) => s.status === "done" || s.people > 0);
+
+  // One entry per thesis the VC has scanned, newest first.
+  const theses = new Map<string, { text: string; scans: Scan[] }>();
+  for (const s of scans) {
+    const text = thesisOf(s)?.text?.trim() ?? "";
+    if (!text) continue;
+    const key = text.toLowerCase();
+    const entry = theses.get(key) ?? { text, scans: [] };
+    entry.scans.push(s);
+    theses.set(key, entry);
   }
-  const thesis = data.scan.theses as { text: string; lane_sizes: Record<string, number> } | null;
-  const sizes = thesis?.lane_sizes ?? {};
-  const counts = (data.scan.counts ?? {}) as Record<string, number>;
+
+  const stats = [
+    [theses.size, theses.size === 1 ? "thesis tracked" : "theses tracked"],
+    [reports.length, reports.length === 1 ? "report saved" : "reports saved"],
+    [data.totalPeople, "people sourced"],
+    [tracked, "on your watchlist"],
+  ] as const;
+
   return (
     <div>
-      <SampleBanner show={data.scan.is_sample} />
-      <div className="mb-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-          Weekly digest
-        </p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight">{thesis?.text}</h1>
-        {data.scan.finished_at && (
-          <p className="mt-2 text-sm text-muted">
-            Scan finished{" "}
-            {new Date(data.scan.finished_at).toLocaleDateString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
+      <SampleBanner show={!real.length && data.scans.length > 0} />
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Dashboard</p>
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight">Your sourcing radar</h1>
+          <p className="mt-2 text-muted">
+            Every scan is saved as a report, and everyone it finds stays in your database. Come back
+            to any of it.
           </p>
-        )}
-        <Funnel counts={counts} />
+        </div>
+        <Link
+          to="/setup"
+          className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground shadow-sm transition-opacity hover:opacity-90"
+        >
+          <ScanSearch className="size-4" /> New scan
+        </Link>
       </div>
-      <div className="grid gap-8 lg:grid-cols-3">
-        {LANES.map((lane) => {
-          const picks = data.picks.filter((p) => p.lane === lane.key);
-          const size = sizes[lane.key] ?? 0;
-          const ui = laneUi(lane.key);
-          return (
-            <section key={lane.key}>
-              <div className="flex items-center gap-2.5">
-                <span className={`size-2.5 rounded-full ${ui.dot}`} />
-                <h2 className="text-lg font-semibold tracking-tight">{lane.title}</h2>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${ui.soft} ${ui.text}`}
-                >
-                  {picks.length}
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-muted">{lane.blurb}</p>
-              <div className="mt-4 space-y-4">
-                {picks.map((p) => (
-                  <FounderCard key={p.id} pick={p} />
-                ))}
-                {picks.length < size && (
-                  <p className="rounded-2xl border border-dashed border-border px-4 py-3 text-sm text-muted">
-                    {picks.length === 0 ? "Nobody" : `Only ${picks.length}`} met the bar this week.
-                  </p>
-                )}
-              </div>
-            </section>
-          );
-        })}
+
+      <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {stats.map(([n, label]) => (
+          <Card key={label} className="gap-1 p-5">
+            <div className="text-3xl font-semibold tabular-nums">{n}</div>
+            <div className="text-sm text-muted">{label}</div>
+          </Card>
+        ))}
       </div>
+
+      <h2 className="mt-12 text-xl font-semibold tracking-tight">Theses you track</h2>
+      <p className="mt-1 text-sm text-muted">
+        Each thesis keeps its own history of reports. Scan again to refresh it.
+      </p>
+      {theses.size === 0 ? (
+        <Card className="mt-4 items-center gap-2 p-12 text-center">
+          <h3 className="text-lg font-semibold">No scans yet</h3>
+          <p className="max-w-md text-sm text-muted">
+            Describe what you invest in and run your first scan.
+          </p>
+          <Link
+            to="/setup"
+            className="mt-3 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground"
+          >
+            Start a scan
+          </Link>
+        </Card>
+      ) : (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {[...theses.values()].map((t) => {
+            const latest = t.scans.find((s) => s.status === "done") ?? t.scans[0]!;
+            const codes = regionCodes(thesisOf(latest)?.school_ids);
+            return (
+              <Card key={t.text} className="gap-4 p-5">
+                <div>
+                  <h3 className="text-lg font-semibold leading-snug">{t.text}</h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {regionNames(thesisOf(latest)?.school_ids).map((r) => (
+                      <Tag key={r}>{r}</Tag>
+                    ))}
+                    <span className="text-sm text-muted">
+                      {t.scans.length} {t.scans.length === 1 ? "scan" : "scans"} · last{" "}
+                      {shortDate(whenOf(latest))}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-default/60 px-4 py-3">
+                  <div>
+                    <div className="text-xs font-medium uppercase tracking-wide text-muted">
+                      Latest picks
+                    </div>
+                    <div className="mt-1">
+                      <LaneCounts lanes={latest.lanes} />
+                    </div>
+                  </div>
+                  <div className="text-right text-sm text-muted">
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {latest.people}
+                    </span>{" "}
+                    people found
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    to="/report/$scanId"
+                    params={{ scanId: latest.id }}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background"
+                  >
+                    <FileText className="size-4" /> Open latest report
+                  </Link>
+                  <Link
+                    to="/setup"
+                    search={{ thesis: t.text, regions: codes.join(",") }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium hover:border-foreground/25"
+                  >
+                    <RefreshCw className="size-4" /> Scan again
+                  </Link>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {reports.length > 0 && (
+        <>
+          <h2 className="mt-12 text-xl font-semibold tracking-tight">All reports</h2>
+          <p className="mt-1 text-sm text-muted">Every scan you have run, newest first.</p>
+          <Card className="mt-4 gap-0 p-0">
+            <ul className="divide-y divide-border">
+              {reports.map((s) => (
+                <li key={s.id}>
+                  <Link
+                    to="/report/$scanId"
+                    params={{ scanId: s.id }}
+                    className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-4 transition-colors hover:bg-default/50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-medium">{thesisOf(s)?.text}</span>
+                        <StatusTag scan={s} />
+                      </div>
+                      <div className="mt-0.5 text-sm text-muted">
+                        {shortDate(whenOf(s))} ·{" "}
+                        {regionNames(thesisOf(s)?.school_ids).join(", ") || "No region"}
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted">
+                      <span className="font-semibold tabular-nums text-foreground">{s.people}</span>{" "}
+                      people
+                    </div>
+                    <LaneCounts lanes={s.lanes} />
+                    <ArrowRight className="size-4 text-muted" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
+            {LANES.map((l) => (
+              <span key={l.key} className="inline-flex items-center gap-1.5">
+                <span className={`size-2 rounded-full ${laneUi(l.key).dot}`} /> {l.title} picks
+              </span>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

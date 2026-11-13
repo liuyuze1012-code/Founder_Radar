@@ -111,14 +111,14 @@ function Tracked() {
         <Card className="items-center gap-2 p-12 text-center">
           <h2 className="text-lg font-semibold">You aren't tracking anyone yet</h2>
           <p className="max-w-md text-sm text-muted">
-            Click Track on a card in the Digest. The list is saved in this browser, so it stays on
+            Click Track on a card in any report. The list is saved in this browser, so it stays on
             this device.
           </p>
           <Link
             to="/"
             className="mt-3 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground"
           >
-            Open the Digest
+            Open the dashboard
           </Link>
         </Card>
       ) : (

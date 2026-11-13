@@ -67,3 +67,17 @@ export const LANES = [
 ] as const;
 export type LaneKey = (typeof LANES)[number]["key"];
 export const laneOf = (k: string | null) => LANES.find((l) => l.key === k) ?? LANES[0];
+
+const LEGACY_DC = ["jhu", "umd", "georgetown", "gwu", "vt"];
+
+/** Region codes for a thesis. Older scans stored one code per school in the DC area. */
+export function regionCodes(codes: string[] | null | undefined): string[] {
+  const list = codes ?? [];
+  const out = list.filter((c) => REGIONS.some((r) => r.id === c));
+  if (list.some((c) => LEGACY_DC.includes(c)) && !out.includes("dc")) out.unshift("dc");
+  return out;
+}
+
+export function regionNames(codes: string[] | null | undefined): string[] {
+  return regionCodes(codes).map((c) => REGIONS.find((r) => r.id === c)?.name ?? c);
+}

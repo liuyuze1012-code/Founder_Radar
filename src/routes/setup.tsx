@@ -7,6 +7,10 @@ import { Button, Card, Input, Label, TextArea } from "@heroui/react";
 import { Check } from "lucide-react";
 
 export const Route = createFileRoute("/setup")({
+  validateSearch: (search: Record<string, unknown>): { thesis?: string; regions?: string } => ({
+    ...(typeof search["thesis"] === "string" ? { thesis: search["thesis"] } : {}),
+    ...(typeof search["regions"] === "string" ? { regions: search["regions"] } : {}),
+  }),
   head: () => ({
     meta: [
       { title: "Setup — Founder Radar" },
@@ -26,8 +30,12 @@ export const Route = createFileRoute("/setup")({
 function Setup() {
   const run = useServerFn(startScan);
   const navigate = useNavigate();
-  const [thesis, setThesis] = useState("");
-  const [regions, setRegions] = useState<string[]>(["dc"]);
+  const search = Route.useSearch();
+  const [thesis, setThesis] = useState(search.thesis ?? "");
+  const [regions, setRegions] = useState<string[]>(() => {
+    const picked = (search.regions ?? "").split(",").filter((c) => REGIONS.some((r) => r.id === c));
+    return picked.length ? picked : ["dc"];
+  });
   // Whole US replaces the named regions; picking a region turns Whole US off.
   const toggleRegion = (id: string, on: boolean) => {
     if (id === "us") return setRegions(on ? ["us"] : []);

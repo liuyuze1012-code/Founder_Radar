@@ -21,10 +21,10 @@ export function TopNav() {
         </Link>
         <nav className="flex items-center gap-1 rounded-full bg-default p-1">
           <Link to="/" className={tab} activeProps={active} activeOptions={{ exact: true }}>
-            Digest
+            Dashboard
           </Link>
-          <Link to="/candidates" className={tab} activeProps={active}>
-            All candidates
+          <Link to="/people" className={tab} activeProps={active}>
+            People
           </Link>
           <Link to="/tracked" className={tab} activeProps={active}>
             Tracked

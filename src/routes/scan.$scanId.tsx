@@ -45,7 +45,10 @@ function ScanProgress() {
           }
           if (r.done) {
             await qc.invalidateQueries();
-            setTimeout(() => !cancelled && navigate({ to: "/" }), 800);
+            setTimeout(
+              () => !cancelled && navigate({ to: "/report/$scanId", params: { scanId } }),
+              800,
+            );
             return;
           }
           await new Promise((res) => setTimeout(res, 500));

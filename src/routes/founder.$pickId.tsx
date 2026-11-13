@@ -75,10 +75,11 @@ function Founder() {
     <div className="mx-auto max-w-5xl">
       <SampleBanner show={data.scan?.is_sample} />
       <Link
-        to="/"
+        to="/report/$scanId"
+        params={{ scanId: pick.scan_id }}
         className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
       >
-        <ArrowLeft className="size-4" /> Back to digest
+        <ArrowLeft className="size-4" /> Back to report
       </Link>
 
       <Card className="mt-4 gap-5 p-6">
@@ -238,7 +239,7 @@ function Founder() {
         </Card>
       ) : (
         <p className="mt-3 text-sm text-muted">
-          No case written yet. Cases are written for digest picks.
+          No case written yet. Cases are written for the picks in each report.
         </p>
       )}
     </div>
