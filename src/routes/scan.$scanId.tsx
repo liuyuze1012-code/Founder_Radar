@@ -37,6 +37,10 @@ function ScanProgress() {
           if (cancelled) return;
           setStage(r.stage);
           setCounts(r.counts as Record<string, number>);
+          if (r.error) {
+            setError(r.error);
+            return;
+          }
           if (r.done) {
             await qc.invalidateQueries();
             setTimeout(() => !cancelled && navigate({ to: "/" }), 800);

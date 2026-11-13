@@ -2,12 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { publicDb } from "./db.server";
 
+// The latest finished scan that produced picks, so the digest never goes blank after an empty run.
 async function latestDoneScan(db: ReturnType<typeof publicDb>) {
   const { data } = await db
     .from("scans")
-    .select("id, status, is_sample, finished_at, counts, thesis_id, theses(text, lane_sizes)")
+    .select("id, status, is_sample, finished_at, counts, thesis_id, theses(text, lane_sizes), picks!inner(id)")
     .eq("status", "done")
     .order("finished_at", { ascending: false })
+    .limit(1, { foreignTable: "picks" })
     .limit(1)
     .maybeSingle();
   return data;

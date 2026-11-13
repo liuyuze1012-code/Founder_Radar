@@ -1,19 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-// Placeholder pipeline. Real internals will replace this via GitHub.
-const PIPELINE: { stage: string; count?: number }[] = [
-  { stage: "translate" },
-  { stage: "collect", count: 500 },
-  { stage: "clean", count: 400 },
-  { stage: "screen", count: 50 },
-  { stage: "resolve", count: 60 },
-  { stage: "enrich", count: 50 },
-  { stage: "score" },
-  { stage: "cases", count: 10 },
-  { stage: "done" },
-];
-
 function safeEqual(a: string, b: string) {
   const ea = new TextEncoder().encode(a);
   const eb = new TextEncoder().encode(b);
@@ -50,7 +37,7 @@ export const startScan = createServerFn({ method: "POST" })
     if (tErr || !thesis) throw new Error("Could not save thesis");
     const { data: scan, error: sErr } = await supabaseAdmin
       .from("scans")
-      .insert({ thesis_id: thesis.id, status: "queued", stage: "translate", counts: {}, rules_version: "placeholder-0", is_sample: false })
+      .insert({ thesis_id: thesis.id, status: "queued", stage: "translate", counts: {}, rules_version: "pending", is_sample: false })
       .select("id")
       .single();
     if (sErr || !scan) throw new Error("Could not create scan");
@@ -60,30 +47,7 @@ export const startScan = createServerFn({ method: "POST" })
 export const advanceScan = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ scanId: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: scan, error } = await supabaseAdmin.from("scans").select("*").eq("id", data.scanId).single();
-    if (error || !scan) throw new Error("Scan not found");
-    const counts = (scan.counts ?? {}) as Record<string, number>;
-    if (scan.status === "done" || scan.status === "failed") {
-      return { stage: scan.stage ?? "done", counts, done: true };
-    }
-    // queued → run current stage; running → move to next stage.
-    let idx = PIPELINE.findIndex((p) => p.stage === scan.stage);
-    if (idx < 0) idx = 0;
-    if (scan.status === "running") idx = Math.min(idx + 1, PIPELINE.length - 1);
-    const step = PIPELINE[idx] ?? PIPELINE[0]!;
-    const nextCounts = step.count != null ? { ...counts, [step.stage]: step.count } : counts;
-    const done = step.stage === "done";
-    await supabaseAdmin
-      .from("scans")
-      .update({
-        stage: step.stage,
-        counts: nextCounts,
-        status: done ? "done" : "running",
-        position: { index: idx },
-        ...(scan.status === "queued" ? { started_at: new Date().toISOString() } : {}),
-        ...(done ? { finished_at: new Date().toISOString() } : {}),
-      })
-      .eq("id", scan.id);
-    return { stage: step.stage, counts: nextCounts, done };
+    // One small unit of work per call. The pipeline lives in src/lib/pipeline.
+    const { runStep } = await import("./pipeline/stages.server");
+    return runStep(data.scanId);
   });
