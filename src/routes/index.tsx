@@ -76,7 +76,7 @@ function Dashboard() {
     const thesisIds = [...new Set(list.map((s) => thesisOf(s)?.id).filter((x): x is string => !!x))];
     const res = await removeFn({ data: { passcode, thesisIds } });
     if (!res.ok) return void toast.error(res.error);
-    toast.success(`Deleted "${data.titles[text] ?? text}"`);
+    toast.success(`Deleted "${(data.titles ?? {})[text] ?? text}"`);
     await qc.invalidateQueries();
   };
   const tracked = Object.keys(useTracked()).length;
@@ -149,7 +149,7 @@ function Dashboard() {
             return (
               <Card key={t.text} className="gap-4 p-5">
                 <div>
-                  <h3 className="text-lg font-semibold leading-snug" title={t.text}>{data.titles[t.text] ?? t.text}</h3>
+                  <h3 className="text-lg font-semibold leading-snug" title={t.text}>{(data.titles ?? {})[t.text] ?? t.text}</h3>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {regionNames(thesisOf(latest)?.school_ids).map((r) => (
                       <Tag key={r}>{r}</Tag>
@@ -220,7 +220,7 @@ function Dashboard() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="truncate font-medium">{data.titles[thesisOf(s)?.text?.trim() ?? ""] ?? thesisOf(s)?.text}</span>
+                        <span className="truncate font-medium">{(data.titles ?? {})[thesisOf(s)?.text?.trim() ?? ""] ?? thesisOf(s)?.text}</span>
                         <StatusTag scan={s} />
                       </div>
                       <div className="mt-0.5 text-sm text-muted">
