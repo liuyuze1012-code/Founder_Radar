@@ -23,9 +23,6 @@ export function TopNav() {
           <Link to="/" className={tab} activeProps={active} activeOptions={{ exact: true }}>
             Dashboard
           </Link>
-          <Link to="/people" className={tab} activeProps={active}>
-            People
-          </Link>
           <Link to="/tracked" className={tab} activeProps={active}>
             Tracked
             {tracked > 0 && (
