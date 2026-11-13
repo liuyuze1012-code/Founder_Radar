@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CandidatesRouteImport } from './routes/candidates'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as TrackedRouteImport } from './routes/tracked'
 import { Route as FounderPickIdRouteImport } from './routes/founder.$pickId'
 import { Route as ScanScanIdRouteImport } from './routes/scan.$scanId'
 
@@ -30,6 +31,11 @@ const SetupRoute = SetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TrackedRoute = TrackedRouteImport.update({
+  id: '/tracked',
+  path: '/tracked',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FounderPickIdRoute = FounderPickIdRouteImport.update({
   id: '/founder/$pickId',
   path: '/founder/$pickId',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/candidates': typeof CandidatesRoute
   '/setup': typeof SetupRoute
+  '/tracked': typeof TrackedRoute
   '/founder/$pickId': typeof FounderPickIdRoute
   '/scan/$scanId': typeof ScanScanIdRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/candidates': typeof CandidatesRoute
   '/setup': typeof SetupRoute
+  '/tracked': typeof TrackedRoute
   '/founder/$pickId': typeof FounderPickIdRoute
   '/scan/$scanId': typeof ScanScanIdRoute
 }
@@ -60,20 +68,33 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/candidates': typeof CandidatesRoute
   '/setup': typeof SetupRoute
+  '/tracked': typeof TrackedRoute
   '/founder/$pickId': typeof FounderPickIdRoute
   '/scan/$scanId': typeof ScanScanIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/candidates' | '/setup' | '/founder/$pickId' | '/scan/$scanId'
+    | '/'
+    | '/candidates'
+    | '/setup'
+    | '/tracked'
+    | '/founder/$pickId'
+    | '/scan/$scanId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/candidates' | '/setup' | '/founder/$pickId' | '/scan/$scanId'
+  to:
+    | '/'
+    | '/candidates'
+    | '/setup'
+    | '/tracked'
+    | '/founder/$pickId'
+    | '/scan/$scanId'
   id:
     | '__root__'
     | '/'
     | '/candidates'
     | '/setup'
+    | '/tracked'
     | '/founder/$pickId'
     | '/scan/$scanId'
   fileRoutesById: FileRoutesById
@@ -82,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CandidatesRoute: typeof CandidatesRoute
   SetupRoute: typeof SetupRoute
+  TrackedRoute: typeof TrackedRoute
   FounderPickIdRoute: typeof FounderPickIdRoute
   ScanScanIdRoute: typeof ScanScanIdRoute
 }
@@ -109,6 +131,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tracked': {
+      id: '/tracked'
+      path: '/tracked'
+      fullPath: '/tracked'
+      preLoaderRoute: typeof TrackedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/founder/$pickId': {
       id: '/founder/$pickId'
       path: '/founder/$pickId'
@@ -130,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CandidatesRoute: CandidatesRoute,
   SetupRoute: SetupRoute,
+  TrackedRoute: TrackedRoute,
   FounderPickIdRoute: FounderPickIdRoute,
   ScanScanIdRoute: ScanScanIdRoute,
 }

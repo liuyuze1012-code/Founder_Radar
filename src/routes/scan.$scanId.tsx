@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { advanceScan } from "@/lib/scan.functions";
 import { STAGES } from "@/lib/radar";
+import { Alert, Card, Spinner } from "@heroui/react";
+import { Check } from "lucide-react";
 
 export const Route = createFileRoute("/scan/$scanId")({
   head: () => ({
@@ -52,32 +54,87 @@ function ScanProgress() {
         if (!cancelled) setError("The scan stopped. Reload the page to continue.");
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [scanId, advance, navigate, qc]);
 
   const current = STAGES.findIndex((s) => s.key === stage);
+  const finished = stage === "done";
+  const pct = Math.round(((finished ? STAGES.length : Math.max(0, current)) / STAGES.length) * 100);
   return (
-    <div className="mx-auto max-w-lg">
-      <h1 className="font-display text-3xl font-bold">Running scan</h1>
-      <p className="mt-1 text-muted-foreground">Keep this page open until it finishes.</p>
-      <ol className="mt-8 space-y-2">
-        {STAGES.map((s, i) => {
-          const state = i < current || stage === "done" ? "done" : i === current ? "active" : "pending";
-          const width = 100 - i * 7;
-          return (
-            <li key={s.key} className="mx-auto" style={{ width: `${width}%` }}>
-              <div className={`flex items-center justify-between rounded-md border px-4 py-2.5 text-sm transition-colors ${
-                state === "done" ? "border-primary bg-primary text-primary-foreground"
-                : state === "active" ? "border-primary bg-secondary font-medium animate-pulse"
-                : "border-border text-muted-foreground"}`}>
-                <span>{s.label}</span>
-                <span className="tabular-nums">{counts[s.key] ?? (state === "done" ? "✓" : "")}</span>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-      {error && <p className="mt-6 text-center text-sm text-destructive">{error}</p>}
+    <div className="mx-auto max-w-xl">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Scan</p>
+      <h1 className="mt-2 text-4xl font-semibold tracking-tight">
+        {finished ? "Scan finished" : "Running scan"}
+      </h1>
+      <p className="mt-2 text-muted">Keep this page open. It usually takes one to three minutes.</p>
+      <Card className="mt-6 gap-0 p-0">
+        <div className="px-5 pt-5">
+          <div className="h-1.5 overflow-hidden rounded-full bg-default">
+            <div
+              className="h-full rounded-full bg-accent transition-[width] duration-500"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+        <ol className="p-2">
+          {STAGES.filter((s) => s.key !== "done").map((s, i) => {
+            const state = i < current || finished ? "done" : i === current ? "active" : "pending";
+            return (
+              <li
+                key={s.key}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${state === "active" ? "bg-accent-soft" : ""}`}
+              >
+                <span
+                  className={`grid size-6 shrink-0 place-items-center rounded-full text-xs ${
+                    state === "done"
+                      ? "bg-accent text-accent-foreground"
+                      : state === "active"
+                        ? "text-accent"
+                        : "bg-default text-muted"
+                  }`}
+                >
+                  {state === "done" ? (
+                    <Check className="size-3.5" />
+                  ) : state === "active" ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    i + 1
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className={`text-sm font-medium ${state === "pending" ? "text-muted" : ""}`}>
+                    {s.label}
+                  </div>
+                  <div className="text-xs text-muted">{STAGE_NOTE[s.key]}</div>
+                </div>
+                <span className="text-sm font-semibold tabular-nums">{counts[s.key] ?? ""}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </Card>
+      {error && (
+        <Alert status="danger" className="mt-4">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>The scan stopped</Alert.Title>
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
     </div>
   );
 }
+
+const STAGE_NOTE: Record<string, string> = {
+  translate: "Turning the thesis into search phrases",
+  collect: "Fetching recent papers and grants",
+  clean: "Removing duplicates and non-research items",
+  screen: "AI reads each record for fit",
+  resolve: "Turning records into people",
+  enrich: "Gathering public evidence on each person",
+  score: "Scoring and sorting into lanes",
+  cases: "Writing a startup case for each pick",
+};

@@ -381,7 +381,7 @@ async function screen(db: Db, scan: Scan): Promise<Step> {
 
 // ---------------------------------------------------------------- resolve
 
-type PoolRow = {
+export type PoolRow = {
   person_id: string;
   item_id: string;
   role: string | null;
@@ -612,7 +612,7 @@ function groupByPerson(pool: PoolRow[]): Map<string, PoolRow[]> {
   return m;
 }
 
-function leadLink(links: PoolRow[]): PoolRow {
+export function leadLink(links: PoolRow[]): PoolRow {
   return [...links].sort(
     (a, b) =>
       (b.items.fit ?? 0) - (a.items.fit ?? 0) ||
@@ -620,7 +620,7 @@ function leadLink(links: PoolRow[]): PoolRow {
   )[0]!;
 }
 
-function paperPeople(links: PoolRow[], person: PoolRow["people"], scope: Scope) {
+export function paperPeople(links: PoolRow[], person: PoolRow["people"], scope: Scope) {
   for (const l of links) {
     if (l.items.source !== "paper") continue;
     const pp = peopleFromPaper(l.items.raw?.authors ?? [], scope);

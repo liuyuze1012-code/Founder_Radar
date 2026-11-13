@@ -8,6 +8,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "@heroui/styles";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -78,8 +79,8 @@
   --color-lane-mov-soft: var(--lane-mov-soft);
   --color-sample: var(--sample);
   --color-sample-foreground: var(--sample-foreground);
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Source Serif 4", Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
@@ -126,6 +127,29 @@
   --lane-mov-soft: oklch(0.95 0.01 255);
   --sample: oklch(0.95 0.06 90);
   --sample-foreground: oklch(0.35 0.08 70);
+}
+
+/*
+ * HeroUI theme tokens. HeroUI components read these names, and some of them (--muted, --accent)
+ * mean something different from the shadcn defaults above, so they are set here on purpose:
+ * --muted is a text gray and --accent is the brand color.
+ */
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.974 0.003 265);
+  --foreground: oklch(0.21 0.02 265);
+  --surface: oklch(1 0 0);
+  --muted: oklch(0.55 0.015 265);
+  --muted-foreground: oklch(0.55 0.015 265);
+  --accent: oklch(0.55 0.21 262);
+  --accent-foreground: oklch(0.99 0 0);
+  --border: oklch(0.915 0.005 265);
+  --lane-pre: oklch(0.52 0.22 295);
+  --lane-pre-soft: oklch(0.955 0.035 295);
+  --lane-exp: oklch(0.66 0.16 62);
+  --lane-exp-soft: oklch(0.96 0.05 80);
+  --lane-mov: oklch(0.58 0.15 155);
+  --lane-mov-soft: oklch(0.955 0.04 155);
 }
 
 .dark {
