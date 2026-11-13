@@ -1,6 +1,6 @@
 // Evidence gathering for one person. Outside requests only (no database), so it can be tested on its own.
 
-import { schoolByOrgName, type SchoolInfo } from "./config";
+import { adHocSchool, schoolByOrgName, type Scope, type SchoolInfo } from "./config";
 import type { RawAuthor } from "./sources.server";
 import {
   authorProfile,
@@ -19,13 +19,19 @@ export type PaperPeople = {
   coauthors: RawAuthor[];
 };
 
-function schoolOfAuthor(a: RawAuthor, schools: SchoolInfo[]): SchoolInfo | null {
+function schoolOfAuthor(a: RawAuthor, scope: Scope): SchoolInfo | null {
+  const schools = scope.schools;
   for (const s of schools) {
     if (a.insts.some((i) => s.openalex.includes(i.id))) return s;
   }
   for (const i of a.insts) {
     const s = schoolByOrgName(i.name, schools);
     if (s) return s;
+  }
+  if (scope.anyUS) {
+    // Whole-US mode: any US institution that is not a company.
+    const us = a.insts.find((i) => i.country === "US" && i.type !== "company" && i.name);
+    if (us) return adHocSchool(us.name, us.id);
   }
   return null;
 }
@@ -35,18 +41,18 @@ function schoolOfAuthor(a: RawAuthor, schools: SchoolInfo[]): SchoolInfo | null 
  * author, if they are. A middle author is never picked: they did not lead the work.
  * Lab head = last author, when the paper has two or more authors and the candidate is the first.
  */
-export function peopleFromPaper(authors: RawAuthor[], schools: SchoolInfo[]): PaperPeople | null {
+export function peopleFromPaper(authors: RawAuthor[], scope: Scope): PaperPeople | null {
   const withId = authors.filter((a) => a.id && a.name);
   const first = withId[0];
   const last = withId[withId.length - 1];
   if (!first || !last) return null;
-  const firstSchool = schoolOfAuthor(first, schools);
+  const firstSchool = schoolOfAuthor(first, scope);
   if (firstSchool) {
     const labHead = withId.length >= 2 && last.id !== first.id ? last : null;
     const coauthors = withId.filter((a) => a.id !== first.id && a.id !== labHead?.id);
     return { candidate: first, role: "lead author", school: firstSchool, labHead, coauthors };
   }
-  const lastSchool = last.id !== first.id ? schoolOfAuthor(last, schools) : null;
+  const lastSchool = last.id !== first.id ? schoolOfAuthor(last, scope) : null;
   if (lastSchool) {
     const coauthors = withId.filter((a) => a.id !== last.id);
     return { candidate: last, role: "senior author", school: lastSchool, labHead: null, coauthors };
@@ -71,7 +77,9 @@ export type EnrichInput = {
 };
 
 /** A company with this many publications or fewer is treated as a small venture, not a large employer. */
-const SMALL_COMPANY_MAX_WORKS = 1500;
+// Checked against real cases: Cerecor 12, BioXcel 78, Ginkgo Bioworks 211; large employers such as
+// D. E. Shaw Research (418), Praxair (517) and Genentech (26,034) fall above the line.
+const SMALL_COMPANY_MAX_WORKS = 300;
 
 const olderThanSixMonths = (iso: string | null) =>
   !!iso && Date.now() - new Date(iso).getTime() > 183 * 86400000;

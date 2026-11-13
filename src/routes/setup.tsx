@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
 import { startScan } from "@/lib/scan.functions";
-import { SCHOOLS } from "@/lib/radar";
+import { REGIONS, REGION_SHORTCUTS } from "@/lib/radar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/setup")({
   head: () => ({
     meta: [
       { title: "Setup — Founder Radar" },
-      { name: "description", content: "Set your thesis, schools and lanes, then run a scan." },
+      { name: "description", content: "Set your thesis, regions and lanes, then run a scan." },
       { property: "og:title", content: "Setup — Founder Radar" },
       { property: "og:description", content: "Set your thesis, schools and lanes, then run a scan." },
       { property: "og:type", content: "website" },
@@ -27,7 +27,12 @@ function Setup() {
   const run = useServerFn(startScan);
   const navigate = useNavigate();
   const [thesis, setThesis] = useState("");
-  const [schools, setSchools] = useState<string[]>(SCHOOLS.map((s) => s.id));
+  const [regions, setRegions] = useState<string[]>(["dc"]);
+  // Whole US replaces the named regions; picking a region turns Whole US off.
+  const toggleRegion = (id: string, on: boolean) => {
+    if (id === "us") return setRegions(on ? ["us"] : []);
+    setRegions(on ? [...regions.filter((r) => r !== "us"), id] : regions.filter((r) => r !== id));
+  };
   const [windowDays, setWindowDays] = useState(60);
   const [lanes, setLanes] = useState({ pre_intent: 5, exploring: 3, already_moving: 2 });
   const [passcode, setPasscode] = useState("");
@@ -38,10 +43,10 @@ function Setup() {
     e.preventDefault();
     setError(null);
     if (thesis.trim().length < 3) return setError("Enter a thesis.");
-    if (!schools.length) return setError("Pick at least one school.");
+    if (!regions.length) return setError("Pick at least one region.");
     setBusy(true);
     try {
-      const res = await run({ data: { thesis, schoolIds: schools, windowDays, laneSizes: lanes, passcode } });
+      const res = await run({ data: { thesis, schoolIds: regions, windowDays, laneSizes: lanes, passcode } });
       if (!res.ok) return setError(res.error);
       navigate({ to: "/scan/$scanId", params: { scanId: res.scanId } });
     } catch {
@@ -70,16 +75,30 @@ function Setup() {
         <Textarea id="thesis" rows={3} placeholder="AI for drug discovery" value={thesis} onChange={(e) => setThesis(e.target.value)} />
       </div>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Schools</legend>
+        <legend className="text-sm font-medium">Regions</legend>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Shortcuts:</span>
+          {REGION_SHORTCUTS.map((sc) => (
+            <Button key={sc.name} type="button" variant="outline" size="sm" onClick={() => setRegions([...sc.ids])}>
+              {sc.name}
+            </Button>
+          ))}
+        </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          {SCHOOLS.map((s) => (
-            <label key={s.id} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-              <Checkbox checked={schools.includes(s.id)}
-                onCheckedChange={(v) => setSchools(v ? [...schools, s.id] : schools.filter((x) => x !== s.id))} />
-              {s.name}
+          {REGIONS.map((r) => (
+            <label key={r.id} className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+              <Checkbox className="mt-0.5" checked={regions.includes(r.id)}
+                onCheckedChange={(v) => toggleRegion(r.id, v === true)} />
+              <span>
+                <span className="font-medium">{r.name}</span>
+                <span className="block text-xs text-muted-foreground">{r.schools}</span>
+              </span>
             </label>
           ))}
         </div>
+        <p className="text-xs text-muted-foreground">
+          Every choice screens the same number of records, so a wider region costs the same.
+        </p>
       </fieldset>
       <div className="max-w-xs space-y-2">
         <Label htmlFor="window">Time window (days)</Label>

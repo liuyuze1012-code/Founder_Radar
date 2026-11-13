@@ -47,7 +47,7 @@ export type RawAuthor = {
   id: string;
   name: string;
   pos: string;
-  insts: { id: string; name: string; type: string | null }[];
+  insts: { id: string; name: string; type: string | null; country?: string | null }[];
 };
 
 export type CollectedItem = {
@@ -70,23 +70,27 @@ function mapAuthors(authorships: any[]): RawAuthor[] {
       id: shortId(i.id),
       name: i.display_name ?? "",
       type: i.type ?? null,
+      country: i.country_code ?? null,
     })),
   }));
   // Keep rows small: the first 12 authors plus the last one.
   return all.length > 13 ? [...all.slice(0, 12), all[all.length - 1]!] : all;
 }
 
-/** Recent papers on a search phrase with an author at one of the schools. */
+/** Recent papers on a search phrase with an author at one of the schools, or anywhere in the US. */
 export async function searchPapers(opts: {
   keyword: string;
-  institutionIds: string[];
+  /** null = any US institution. */
+  institutionIds: string[] | null;
   since: string;
   perPage: number;
 }): Promise<CollectedItem[]> {
   const url = openalexUrl("/works", {
     search: opts.keyword,
     filter: [
-      `authorships.institutions.lineage:${opts.institutionIds.join("|")}`,
+      opts.institutionIds
+        ? `authorships.institutions.lineage:${opts.institutionIds.join("|")}`
+        : "authorships.institutions.country_code:US",
       `from_publication_date:${opts.since}`,
       "type:article|preprint",
     ].join(","),
@@ -127,15 +131,16 @@ function isoFromNsf(d: string | null | undefined): string | null {
 }
 const nsfAwardUrl = (id: string) => `https://www.nsf.gov/awardsearch/showAward?AWD_ID=${id}`;
 
-/** I-Corps awards in one state since a date (NSF Awards API). */
+/** I-Corps awards since a date, in one state or nationally (NSF Awards API). */
 export async function searchIcorps(opts: {
-  state: string;
+  /** null = all states. */
+  state: string | null;
   since: string;
   offset?: number;
 }): Promise<CollectedItem[]> {
   const q = new URLSearchParams({
     keyword: '"I-Corps"',
-    awardeeStateCode: opts.state,
+    ...(opts.state ? { awardeeStateCode: opts.state } : {}),
     dateStart: nsfDate(opts.since),
     printFields: "id,title,abstractText,piFirstName,piLastName,awardeeName,startDate",
     rpp: "25",
@@ -360,4 +365,21 @@ export async function findAuthorsAtSchool(
     name: a.display_name ?? "",
     works: a.works_count ?? 0,
   }));
+}
+
+/** The US institution a free-text organization name refers to, for whole-US mode. */
+export async function lookupInstitution(
+  name: string,
+): Promise<{ id: string; name: string } | null> {
+  const data = await getJson(
+    "OpenAlex",
+    openalexUrl("/institutions", {
+      search: name.replace(/[^A-Za-z ]+/g, " "),
+      filter: "country_code:US",
+      select: "id,display_name",
+      per_page: "1",
+    }),
+  );
+  const hit = (data.results ?? [])[0];
+  return hit ? { id: shortId(hit.id), name: hit.display_name ?? name } : null;
 }

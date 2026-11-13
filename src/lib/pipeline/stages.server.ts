@@ -11,7 +11,9 @@ import {
   RULES_VERSION,
   SCREEN_BATCH,
   schoolByOrgName,
-  schoolsFor,
+  scopeFor,
+  adHocSchool,
+  type Scope,
   trackForField,
   type SchoolInfo,
 } from "./config";
@@ -20,6 +22,7 @@ import { nameMatch, pickCandidate } from "./match";
 import { buildSignals, judge, selectDigest, type Signal } from "./score";
 import {
   findAuthorsAtSchool,
+  lookupInstitution,
   isoDaysAgo,
   searchIcorps,
   searchPapers,
@@ -170,12 +173,16 @@ async function translate(db: Db, scan: Scan): Promise<Step> {
 // ---------------------------------------------------------------- collect
 
 async function collect(db: Db, scan: Scan): Promise<Step> {
-  const schools = schoolsFor(scan.theses.school_ids);
+  const scope = scopeFor(scan.theses.school_ids);
+  const schools = scope.schools;
   const keywords = scan.theses.keywords ?? [];
-  const states = [...new Set(schools.map((s) => s.state))];
-  const units: ({ t: "papers"; k: string } | { t: "icorps"; s: string })[] = [
+  type Unit = { t: "papers"; k: string } | { t: "icorps"; s: string | null; offset: number };
+  const units: Unit[] = [
     ...keywords.map((k) => ({ t: "papers" as const, k })),
-    ...states.map((s) => ({ t: "icorps" as const, s })),
+    // Whole-US mode searches grants nationally, two pages.
+    ...(scope.anyUS
+      ? [1, 26].map((offset) => ({ t: "icorps" as const, s: null, offset }))
+      : scope.states.map((st) => ({ t: "icorps" as const, s: st, offset: 1 }))),
   ];
   const i: number = scan.position?.unit ?? 0;
   const existing = must<{ source_id: string }[]>(
@@ -190,7 +197,7 @@ async function collect(db: Db, scan: Scan): Promise<Step> {
   if (unit.t === "papers") {
     found = await searchPapers({
       keyword: unit.k,
-      institutionIds: schools.flatMap((s) => s.openalex),
+      institutionIds: scope.anyUS ? null : schools.flatMap((s) => s.openalex),
       since: isoDaysAgo(scan.theses.window_days),
       perPage: Math.ceil(PAPERS_BUDGET / Math.max(1, keywords.length)),
     });
@@ -199,8 +206,11 @@ async function collect(db: Db, scan: Scan): Promise<Step> {
     const awards = await searchIcorps({
       state: unit.s,
       since: isoDaysAgo(GRANT_WINDOW_DAYS),
+      offset: unit.offset,
     }).catch(() => []);
-    found = awards.filter((g) => schoolByOrgName(g.raw["awardee"] as string, schools));
+    found = scope.anyUS
+      ? awards
+      : awards.filter((g) => schoolByOrgName(g.raw["awardee"] as string, schools));
   }
   const fresh: CollectedItem[] = [];
   for (const f of found) {
@@ -420,7 +430,8 @@ async function loadPool(db: Db, scanId: string, withRaw: boolean): Promise<PoolR
 }
 
 async function resolve(db: Db, scan: Scan): Promise<Step> {
-  const schools = schoolsFor(scan.theses.school_ids);
+  const scope = scopeFor(scan.theses.school_ids);
+  const schools = scope.schools;
   const phase: string = scan.position?.phase ?? "papers";
 
   if (phase === "papers") {
@@ -445,7 +456,7 @@ async function resolve(db: Db, scan: Scan): Promise<Step> {
       }
     >();
     for (const it of papers) {
-      const pp = peopleFromPaper(it.raw?.authors ?? [], schools);
+      const pp = peopleFromPaper(it.raw?.authors ?? [], scope);
       if (!pp) continue;
       const entry = people.get(pp.candidate.id) ?? {
         row: {
@@ -529,8 +540,12 @@ async function resolve(db: Db, scan: Scan): Promise<Step> {
   }
   for (const g of grants) {
     const name = g.raw?.pi ?? "";
-    const school = schoolByOrgName(g.raw?.awardee, schools);
-    if (!name || !school) continue;
+    let school = schoolByOrgName(g.raw?.awardee, schools);
+    if (!school && scope.anyUS && g.raw?.awardee) {
+      const inst = await lookupInstitution(g.raw.awardee).catch(() => null);
+      if (inst) school = adHocSchool(inst.name, inst.id);
+    }
+    if (!name || !school || !school.openalex.length) continue;
     let personId: string | null = null;
     let confidence: "high" | "medium" = "high";
     let reason = "Same full name at the same school as a person already in the pool";
@@ -605,26 +620,24 @@ function leadLink(links: PoolRow[]): PoolRow {
   )[0]!;
 }
 
-function paperPeople(links: PoolRow[], person: PoolRow["people"], schools: SchoolInfo[]) {
+function paperPeople(links: PoolRow[], person: PoolRow["people"], scope: Scope) {
   for (const l of links) {
     if (l.items.source !== "paper") continue;
-    const pp = peopleFromPaper(l.items.raw?.authors ?? [], schools);
+    const pp = peopleFromPaper(l.items.raw?.authors ?? [], scope);
     if (pp && pp.candidate.id === person.openalex_id) return pp;
   }
   return null;
 }
 
-async function enrichOne(
-  db: Db,
-  scan: Scan,
-  links: PoolRow[],
-  schools: SchoolInfo[],
-): Promise<void> {
+async function enrichOne(db: Db, scan: Scan, links: PoolRow[], scope: Scope): Promise<void> {
   const person = links[0]!.people;
   if (!person.openalex_id) return;
   const lead = leadLink(links);
-  const pp = paperPeople(links, person, schools);
-  const school = schools.find((s) => s.name === person.school) ?? null;
+  const pp = paperPeople(links, person, scope);
+  const school: SchoolInfo | null =
+    scope.schools.find((s) => s.name === person.school) ??
+    pp?.school ??
+    (person.school ? adHocSchool(person.school) : null);
   const facts = await gatherFacts({
     authorId: person.openalex_id,
     name: person.name,
@@ -681,13 +694,14 @@ async function enrichOne(
 }
 
 async function enrich(db: Db, scan: Scan): Promise<Step> {
-  const schools = schoolsFor(scan.theses.school_ids);
+  const scope = scopeFor(scan.theses.school_ids);
+  const schools = scope.schools;
   const byPerson = groupByPerson(await loadPool(db, scan.id, true));
   const ids = [...byPerson.keys()].sort().slice(0, MAX_PEOPLE);
   const i: number = scan.position?.unit ?? 0;
   const batch = ids.slice(i, i + ENRICH_PER_CALL);
   if (!batch.length) return { stage: "score", counts: { enrich: ids.length } };
-  await Promise.all(batch.map((id) => enrichOne(db, scan, byPerson.get(id)!, schools)));
+  await Promise.all(batch.map((id) => enrichOne(db, scan, byPerson.get(id)!, scope)));
   return {
     stage: "enrich",
     position: { unit: i + batch.length },
@@ -744,7 +758,8 @@ const toSignal = (e: EvidenceRow): Signal => ({
 });
 
 async function score(db: Db, scan: Scan): Promise<Step> {
-  const schools = schoolsFor(scan.theses.school_ids);
+  const scope = scopeFor(scan.theses.school_ids);
+  const schools = scope.schools;
   const byPerson = groupByPerson(await loadPool(db, scan.id, true));
   const evidence = await loadEvidence(db, scan.id);
   const signalsOf = new Map<string, Signal[]>();
@@ -755,7 +770,7 @@ async function score(db: Db, scan: Scan): Promise<Step> {
     .filter(([id]) => signalsOf.has(id))
     .map(([id, links]) => {
       const person = links[0]!.people;
-      const pp = paperPeople(links, person, schools);
+      const pp = paperPeople(links, person, scope);
       const intro: { type: string; name: string; detail: string }[] = [];
       if (pp?.labHead)
         intro.push({
