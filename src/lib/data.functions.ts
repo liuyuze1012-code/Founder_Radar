@@ -134,7 +134,11 @@ export const getDashboard = createServerFn({ method: "GET" }).handler(async () =
     byScan.set(p.scan_id, entry);
     if (!hasReal || !sampleIds.has(p.scan_id)) people.add(p.person_id);
   }
+  const { reportTitle } = await import("./report-title.server");
+  const texts = [...new Set((scans ?? []).map((s) => (s.theses as { text?: string } | null)?.text?.trim() ?? "").filter(Boolean))];
+  const titles = Object.fromEntries(await Promise.all(texts.map(async (t) => [t, await reportTitle(t)] as const)));
   return {
+    titles,
     scans: (scans ?? []).map((s) => ({
       ...s,
       lanes: byScan.get(s.id)?.lanes ?? { pre_intent: 0, exploring: 0, already_moving: 0 },

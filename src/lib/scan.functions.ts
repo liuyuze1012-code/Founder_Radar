@@ -59,3 +59,25 @@ export const advanceScan = createServerFn({ method: "POST" })
     const { runStep } = await import("./pipeline/stages.server");
     return runStep(data.scanId);
   });
+
+// Delete every scan (and its saved results) for the given theses. People stay in the database.
+export const deleteTheses = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ passcode: z.string(), thesisIds: z.array(z.string().uuid()).min(1).max(50) }).parse(d))
+  .handler(async ({ data }) => {
+    const expected = process.env["SCAN_PASSCODE"];
+    if (!expected || !safeEqual(data.passcode, expected)) return { ok: false as const, error: "Wrong passcode." };
+    const { publicDb } = await import("./db.server");
+    const db = publicDb();
+    const { data: scans } = await db.from("scans").select("id").in("thesis_id", data.thesisIds);
+    const scanIds = (scans ?? []).map((s) => s.id);
+    if (scanIds.length) {
+      const { data: items } = await db.from("items").select("id").in("scan_id", scanIds);
+      const itemIds = (items ?? []).map((i) => i.id);
+      for (let i = 0; i < itemIds.length; i += 200) await db.from("person_items").delete().in("item_id", itemIds.slice(i, i + 200));
+      for (const t of ["cases", "evidence", "picks", "items"] as const) await db.from(t).delete().in("scan_id", scanIds);
+      await db.from("scans").delete().in("id", scanIds);
+    }
+    const { error } = await db.from("theses").delete().in("id", data.thesisIds);
+    if (error) return { ok: false as const, error: "Could not delete this thesis." };
+    return { ok: true as const };
+  });

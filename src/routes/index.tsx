@@ -1,7 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { Card } from "@heroui/react";
-import { ArrowRight, FileText, RefreshCw, ScanSearch } from "lucide-react";
+import { ArrowRight, FileText, RefreshCw, ScanSearch, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { deleteTheses } from "@/lib/scan.functions";
 import { getDashboard } from "@/lib/data.functions";
 import { LANES, regionCodes, regionNames } from "@/lib/radar";
 import { useTracked } from "@/lib/tracking";
@@ -31,7 +35,7 @@ export const Route = createFileRoute("/")({
 });
 
 type Scan = Awaited<ReturnType<typeof getDashboard>>["scans"][number];
-type ThesisRow = { text: string; school_ids: string[] } | null;
+type ThesisRow = { id: string; text: string; school_ids: string[] } | null;
 
 const thesisOf = (s: Scan) => s.theses as ThesisRow;
 const whenOf = (s: Scan) => s.finished_at ?? s.started_at ?? "";
@@ -63,6 +67,18 @@ function StatusTag({ scan }: { scan: Scan }) {
 
 function Dashboard() {
   const { data } = useSuspenseQuery(dashboardQuery);
+  const qc = useQueryClient();
+  const removeFn = useServerFn(deleteTheses);
+  const remove = async (text: string, list: Scan[]) => {
+    if (!window.confirm(`Delete this thesis and its ${list.length} ${list.length === 1 ? "scan" : "scans"}?`)) return;
+    const passcode = window.prompt("Passcode");
+    if (!passcode) return;
+    const thesisIds = [...new Set(list.map((s) => thesisOf(s)?.id).filter((x): x is string => !!x))];
+    const res = await removeFn({ data: { passcode, thesisIds } });
+    if (!res.ok) return void toast.error(res.error);
+    toast.success(`Deleted "${data.titles[text] ?? text}"`);
+    await qc.invalidateQueries();
+  };
   const tracked = Object.keys(useTracked()).length;
   const real = data.scans.filter((s) => !s.is_sample);
   const scans = real.length ? real : data.scans;
@@ -133,7 +149,7 @@ function Dashboard() {
             return (
               <Card key={t.text} className="gap-4 p-5">
                 <div>
-                  <h3 className="text-lg font-semibold leading-snug">{t.text}</h3>
+                  <h3 className="text-lg font-semibold leading-snug" title={t.text}>{data.titles[t.text] ?? t.text}</h3>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {regionNames(thesisOf(latest)?.school_ids).map((r) => (
                       <Tag key={r}>{r}</Tag>
@@ -175,6 +191,14 @@ function Dashboard() {
                   >
                     <RefreshCw className="size-4" /> Scan again
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => remove(t.text, t.scans)}
+                    aria-label="Delete thesis"
+                    className="ml-auto inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
                 </div>
               </Card>
             );
@@ -196,7 +220,7 @@ function Dashboard() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="truncate font-medium">{thesisOf(s)?.text}</span>
+                        <span className="truncate font-medium">{data.titles[thesisOf(s)?.text?.trim() ?? ""] ?? thesisOf(s)?.text}</span>
                         <StatusTag scan={s} />
                       </div>
                       <div className="mt-0.5 text-sm text-muted">
