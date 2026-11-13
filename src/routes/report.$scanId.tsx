@@ -141,10 +141,7 @@ function Report() {
         })}
       </div>
 
-      <h2 className="mt-14 text-xl font-semibold tracking-tight">Everyone in this scan</h2>
-      <p className="mb-4 mt-1 text-sm text-muted">
-        All {data.picks.length} people the scan identified, including those below the bar and why.
-      </p>
+      <h2 className="mb-4 mt-14 text-xl font-semibold tracking-tight">Everyone in this scan</h2>
       <PeopleTable rows={data.picks} />
     </div>
   );

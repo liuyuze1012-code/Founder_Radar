@@ -74,10 +74,6 @@ function Tracked() {
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Watchlist</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight">Tracked</h1>
-          <p className="mt-2 text-muted">
-            A single look can't tell who will start a company. A change can: a new I-Corps award, a
-            company appearing on their papers. Rescan to see what's new for the people you track.
-          </p>
         </div>
         {people.length > 0 && (
           <Card className="w-full max-w-sm gap-3 p-4">

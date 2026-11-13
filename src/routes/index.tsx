@@ -93,10 +93,6 @@ function Dashboard() {
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Dashboard</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight">Your sourcing radar</h1>
-          <p className="mt-2 text-muted">
-            Every scan is saved as a report, and everyone it finds stays in your database. Come back
-            to any of it.
-          </p>
         </div>
         <Link
           to="/setup"
@@ -116,9 +112,6 @@ function Dashboard() {
       </div>
 
       <h2 className="mt-12 text-xl font-semibold tracking-tight">Theses you track</h2>
-      <p className="mt-1 text-sm text-muted">
-        Each thesis keeps its own history of reports. Scan again to refresh it.
-      </p>
       {theses.size === 0 ? (
         <Card className="mt-4 items-center gap-2 p-12 text-center">
           <h3 className="text-lg font-semibold">No scans yet</h3>
@@ -192,7 +185,6 @@ function Dashboard() {
       {reports.length > 0 && (
         <>
           <h2 className="mt-12 text-xl font-semibold tracking-tight">All reports</h2>
-          <p className="mt-1 text-sm text-muted">Every scan you have run, newest first.</p>
           <Card className="mt-4 gap-0 p-0">
             <ul className="divide-y divide-border">
               {reports.map((s) => (

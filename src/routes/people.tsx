@@ -34,10 +34,6 @@ function People() {
       <SampleBanner show={data.isSample} />
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Database</p>
       <h1 className="mt-2 text-4xl font-semibold tracking-tight">People</h1>
-      <p className="mt-2 max-w-2xl text-muted">
-        Everyone your scans have sourced, kept across every report. Each person shows their most
-        recent scores. Open a row for the evidence.
-      </p>
       <div className="mt-6">
         <PeopleTable rows={data.rows} showThesis />
       </div>

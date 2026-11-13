@@ -86,10 +86,6 @@ function Setup() {
     <form onSubmit={submit} className="mx-auto max-w-3xl">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">New scan</p>
       <h1 className="mt-2 text-4xl font-semibold tracking-tight">What do you invest in?</h1>
-      <p className="mt-2 text-muted">
-        Describe your thesis in plain words. The scan reads recent papers and grants, then shows the
-        people behind them.
-      </p>
 
       <Card className="mt-8 gap-6 p-6">
         <div className="grid gap-1.5">

@@ -130,9 +130,6 @@ function Founder() {
       </div>
 
       <h2 className="mt-10 text-xl font-semibold tracking-tight">Evidence</h2>
-      <p className="mt-1 text-sm text-muted">
-        Every line comes from a public record. Follow the source link to check it.
-      </p>
       <div className="mt-4 space-y-4">
         {GROUPS.map(([g, label]) => {
           const rows = evidence.filter((e) => e.score_group === g);
@@ -214,9 +211,6 @@ function Founder() {
       )}
 
       <h2 className="mt-10 text-xl font-semibold tracking-tight">Startup case</h2>
-      <p className="mt-1 text-sm text-muted">
-        Written by AI from the records above. Treat it as a possibility, not a fact.
-      </p>
       {c ? (
         <Card className="mt-4 p-6">
           <dl className="grid gap-6 sm:grid-cols-2">
