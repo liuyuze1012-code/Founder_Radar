@@ -3,6 +3,7 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getPickDetail } from "@/lib/data.functions";
 import { Card } from "@heroui/react";
 import { ArrowLeft, ExternalLink } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   ActionChip,
   LaneBadge,
@@ -43,13 +44,6 @@ export const Route = createFileRoute("/founder/$pickId")({
   component: Founder,
 });
 
-const GROUPS = [
-  ["research", "Research potential"],
-  ["propensity", "Founder propensity"],
-  ["timing", "Timing"],
-  ["lane", "Lane signals"],
-] as const;
-
 type IntroPath = { type?: string; name?: string; detail?: string };
 
 const STATUS_NOTE: Record<string, string> = {
@@ -66,9 +60,9 @@ function Founder() {
   const ui = laneUi(pick.lane);
   const intros = (Array.isArray(pick.intro_paths) ? pick.intro_paths : []) as IntroPath[];
   const scores = [
-    ["Research potential", pick.research_score, pick.research_coverage],
-    ["Founder propensity", pick.propensity_score, pick.propensity_coverage],
-    ["Timing", pick.timing_score, pick.timing_coverage],
+    ["research", "Research potential", pick.research_score, pick.research_coverage],
+    ["propensity", "Founder propensity", pick.propensity_score, pick.propensity_coverage],
+    ["timing", "Timing", pick.timing_score, pick.timing_coverage],
   ] as const;
 
   return (
@@ -110,35 +104,42 @@ function Founder() {
         </div>
       </Card>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        {scores.map(([label, v, cov]) => (
-          <Card key={label} className="gap-2 p-5">
-            <div className="text-sm text-muted">{label}</div>
-            <div className="text-3xl font-semibold tabular-nums">
-              {fmtScore(v)}
-              <span className="text-base font-normal text-muted">/10</span>
+      <h2 className="mt-10 text-xl font-semibold tracking-tight">Startup case</h2>
+      {c ? (
+        <dl className="mt-4 grid gap-6 sm:grid-cols-2">
+          {([
+            ["Product", c.product],
+            ["Buyer", c.buyer],
+            ["Competitors", c.competitors],
+            ["Distance to market", c.distance_to_market],
+            ["Risks", c.risks],
+            ["What's unverified", c.unverified],
+          ] as const).map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt>
+              <dd className="mt-1.5 text-sm leading-relaxed">{value ?? "—"}</dd>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-default">
-              <div
-                className={`h-full rounded-full ${ui.bar}`}
-                style={{ width: `${Math.max(0, Math.min(10, Number(v ?? 0))) * 10}%` }}
-              />
-            </div>
-            <div className="text-xs text-muted">{cov ?? "Coverage unknown"}</div>
-          </Card>
-        ))}
-      </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="mt-3 text-sm text-muted">No case written yet.</p>
+      )}
 
-      <h2 className="mt-10 text-xl font-semibold tracking-tight">Evidence</h2>
-      <div className="mt-4 space-y-4">
-        {GROUPS.map(([g, label]) => {
+      <Accordion type="multiple" className="mt-10 border-t border-border">
+        {scores.map(([g, label, v, cov]) => {
           const rows = evidence.filter((e) => e.score_group === g);
-          if (!rows.length) return null;
           return (
-            <Card key={g} className="gap-0 p-0">
-              <h3 className="border-b border-border px-5 py-3 text-xs font-semibold uppercase tracking-wide text-muted">
-                {label}
-              </h3>
+            <AccordionItem key={g} value={g} className="border-border">
+              <AccordionTrigger className="gap-4 py-5 hover:no-underline">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-semibold">{label}</span>
+                  <span className="mt-1 block text-xs font-normal text-muted">{cov ?? "Coverage unknown"}</span>
+                </span>
+                <span className="shrink-0 text-xl font-semibold tabular-nums">
+                  {fmtScore(v)}<span className="text-sm font-normal text-muted">/10</span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
               <ul className="divide-y divide-border">
                 {rows.map((e) => (
                   <li
@@ -150,12 +151,12 @@ function Founder() {
                       <div className="text-muted">{e.value}</div>
                     </div>
                     <div className="flex items-center gap-3 text-muted">
-                      {e.status && e.status !== "observed" ? (
+                      {e.status && e.status !== "observed" && (
                         <span className="rounded-full bg-default px-2 py-0.5 text-xs">
                           {STATUS_NOTE[e.status] ?? e.status}
                         </span>
-                      ) : (
-                        e.points != null && (
+                      )}
+                      {e.points != null && (
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
                               e.points > 0 ? `${ui.soft} ${ui.text}` : "bg-default"
@@ -163,7 +164,6 @@ function Founder() {
                           >
                             {e.points}/{e.max_points}
                           </span>
-                        )
                       )}
                       {e.event_date && (
                         <span className="text-xs">
@@ -187,11 +187,12 @@ function Founder() {
                   </li>
                 ))}
               </ul>
-            </Card>
+              {!rows.length && <p className="text-sm text-muted">No signals recorded.</p>}
+              </AccordionContent>
+            </AccordionItem>
           );
         })}
-        {!evidence.length && <p className="text-sm text-muted">No evidence recorded.</p>}
-      </div>
+      </Accordion>
 
       <h2 className="mt-10 text-xl font-semibold tracking-tight">Possible intro paths</h2>
       {intros.length ? (
@@ -210,32 +211,6 @@ function Founder() {
         <p className="mt-3 text-sm text-muted">None found.</p>
       )}
 
-      <h2 className="mt-10 text-xl font-semibold tracking-tight">Startup case</h2>
-      {c ? (
-        <Card className="mt-4 p-6">
-          <dl className="grid gap-6 sm:grid-cols-2">
-            {(
-              [
-                ["Product", c.product],
-                ["Buyer", c.buyer],
-                ["Competitors", c.competitors],
-                ["Distance to market", c.distance_to_market],
-                ["Risks", c.risks],
-                ["What's unverified", c.unverified],
-              ] as const
-            ).map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{k}</dt>
-                <dd className="mt-1.5 text-sm leading-relaxed">{v ?? "—"}</dd>
-              </div>
-            ))}
-          </dl>
-        </Card>
-      ) : (
-        <p className="mt-3 text-sm text-muted">
-          No case written yet. Cases are written for the picks in each report.
-        </p>
-      )}
     </div>
   );
 }

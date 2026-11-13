@@ -242,10 +242,6 @@ export function FounderCard({ pick, reportSummary = false }: { pick: PickRow; re
             <span className="text-muted">Idea · </span>
             {pick.cardSummary?.idea ?? pick.sourceIdea ?? "No source description available"}
           </p>
-          <p className="text-foreground/90">
-            <span className="font-medium text-muted">Why selected · </span>
-            {pick.cardSummary?.qualification ?? pick.why ?? "Selection evidence unavailable"}
-          </p>
         </div>
       ) : (
         <p className="text-sm leading-relaxed text-foreground/90">{pick.why}</p>

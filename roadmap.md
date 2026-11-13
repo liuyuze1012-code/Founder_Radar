@@ -3,3 +3,6 @@
 - [x] Verify the current report on desktop and mobile without changing scoring.
 - [x] Remove the startup-case dependency from card ideas; use linked paper abstracts, repository READMEs, and grant abstracts.
 - [x] Verify the newest report and explain where startup-case products come from.
+- [x] Keep only the idea on report cards.
+- [x] Put startup cases first, collapse evidence under each score, and move intro paths last.
+- [x] Verify report cards and all three score dropdowns on desktop and mobile.
