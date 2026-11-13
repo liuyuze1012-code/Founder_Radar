@@ -419,6 +419,13 @@ async function github(path: string, raw = false): Promise<any> {
 }
 
 /** The arXiv paper a repository's README points to first, if any. Research code usually links its paper. */
+export async function repoReadme(fullName: string): Promise<string> {
+  // Only permit an owner/repository pair, never an arbitrary request path.
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(fullName)) return "";
+  const readme: string = await github(`/repos/${fullName}/readme`, true);
+  return readme.slice(0, 12000);
+}
+
 export async function repoArxivId(fullName: string): Promise<string | null> {
   const readme: string = await github(`/repos/${fullName}/readme`, true);
   const m = readme.slice(0, 20000).match(/arxiv\.org\/(?:abs|pdf)\/(\d{4}\.\d{4,5})/i);

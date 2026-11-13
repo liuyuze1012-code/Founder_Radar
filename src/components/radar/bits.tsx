@@ -13,6 +13,7 @@ export type PickRow = {
   action: string | null;
   why: string | null;
   cardSummary?: { idea: string; qualification: string } | null;
+  sourceIdea?: string | null;
   research_score: number | string | null;
   propensity_score: number | string | null;
   timing_score: number | string | null;
@@ -239,7 +240,7 @@ export function FounderCard({ pick, reportSummary = false }: { pick: PickRow; re
         <div className="space-y-2 text-sm leading-relaxed">
           <p className="font-medium text-foreground">
             <span className="text-muted">Idea · </span>
-            {pick.cardSummary?.idea ?? "Idea summary unavailable"}
+            {pick.cardSummary?.idea ?? pick.sourceIdea ?? "No source description available"}
           </p>
           <p className="text-foreground/90">
             <span className="font-medium text-muted">Why selected · </span>

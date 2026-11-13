@@ -33,4 +33,4 @@ use the editor.
 - Server logic lives in `src/lib/*.functions.ts` (startScan, advanceScan, data reads) and `src/lib/*.server.ts` (callAI, db clients) — these are the files to replace via GitHub; they keep one-step-per-call scans within worker time limits.
 - All tables are read-only to the public (SELECT policies); writes happen only in server functions via the service-role client.
 - Pages read from the database only, never hardcoded data; the sample scan is flagged `is_sample = true` and shows a banner.
-- Report card summaries are presentation-only rewrites of saved cases.product and picks.why; validate seven- or eight-word ideas, cache by source content, and never alter sourcing, scoring, or saved startup cases.
+- Report card summaries are presentation-only: derive ideas from linked items.summary (paper/grant abstracts or repository README), use cases.product only as fallback, and qualifications from picks.why; validate seven- or eight-word rewrites, cache by source content, fall back to saved source titles on rewrite failure, and never alter sourcing, scoring, or saved startup cases.

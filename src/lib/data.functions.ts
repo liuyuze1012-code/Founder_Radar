@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { publicDb } from "./db.server";
+import { ideaInput, selectIdeaRecord } from "./report-summary";
 
 // The latest finished scan that produced picks, so the digest never goes blank after an empty run.
 async function latestDoneScan(db: ReturnType<typeof publicDb>) {
@@ -160,27 +161,47 @@ export const getReport = createServerFn({ method: "GET" })
       .select(PICK_SELECT)
       .eq("scan_id", scan.id)
       .order("rank");
-    const { data: cases } = await db
-      .from("cases")
-      .select("person_id, product")
-      .eq("scan_id", scan.id);
-    const { reportSummaries } = await import("./report-summary.server");
     const digest = (picks ?? []).filter((pick) => pick.in_digest);
+    const [{ data: cases, error: caseError }, { data: links, error: sourceError }] = await Promise.all([
+      db.from("cases").select("person_id, product").eq("scan_id", scan.id),
+      digest.length
+        ? db.from("person_items")
+          .select("person_id, items!inner(scan_id, source, source_id, title, summary, fit)")
+          .in("person_id", digest.map((pick) => pick.person_id))
+          .eq("items.scan_id", scan.id)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (sourceError) throw new Error("Could not read the report's source records.");
+    if (caseError) throw new Error("Could not read the report's startup cases.");
+    const { reportSummaries } = await import("./report-summary.server");
+    const sources = digest.map((pick) => {
+      const record = selectIdeaRecord((links ?? []).filter((link) => link.person_id === pick.person_id).map((link) => link.items));
+      const product = cases?.find((entry) => entry.person_id === pick.person_id)?.product ?? null;
+      return {
+        id: pick.id,
+        ideaText: ideaInput(record, product),
+        repo: record?.source === "repo" ? record.source_id?.replace(/^gh:/, "") ?? null : null,
+        // Display actual saved text if rewriting fails, rather than claiming no idea exists.
+        fallbackIdea: record?.title?.trim() || product?.trim() || null,
+        why: pick.why,
+      };
+    });
     let summaries = new Map<string, { idea: string; qualification: string }>();
     let summaryError: string | null = null;
     try {
-      summaries = await reportSummaries(digest.map((pick) => ({
-        id: pick.id,
-        product: cases?.find((entry) => entry.person_id === pick.person_id)?.product ?? null,
-        why: pick.why,
-      })));
+      summaries = await reportSummaries(sources);
     } catch (error) {
-      summaryError = error instanceof Error ? error.message : "Card summaries could not be generated.";
+      console.error("Report summary rewrite failed", error);
+      summaryError = "Short summaries could not be generated. Saved source titles are shown instead.";
     }
     return {
       scan,
       summaryError,
-      picks: (picks ?? []).map((pick) => ({ ...pick, cardSummary: summaries.get(pick.id) ?? null })),
+      picks: (picks ?? []).map((pick) => ({
+        ...pick,
+        cardSummary: summaries.get(pick.id) ?? null,
+        sourceIdea: sources.find((source) => source.id === pick.id)?.fallbackIdea ?? null,
+      })),
     };
   });
 
