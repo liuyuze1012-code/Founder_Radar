@@ -103,27 +103,6 @@ function Founder() {
         </div>
       </Card>
 
-      <h2 className="mt-10 text-xl font-semibold tracking-tight">Startup case</h2>
-      {c ? (
-        <dl className="mt-4 grid gap-6 sm:grid-cols-2">
-          {([
-            ["Product", c.product],
-            ["Buyer", c.buyer],
-            ["Competitors", c.competitors],
-            ["Distance to market", c.distance_to_market],
-            ["Risks", c.risks],
-            ["What's unverified", c.unverified],
-          ] as const).map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt>
-              <dd className="mt-1.5 text-sm leading-relaxed">{value ?? "—"}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="mt-3 text-sm text-muted">No case written yet.</p>
-      )}
-
       <div className="mt-10 border-t border-border">
         {scores.map(([g, label, v, cov]) => {
           const rows = evidence.filter((e) => e.score_group === g);
@@ -193,6 +172,27 @@ function Founder() {
           );
         })}
       </div>
+
+      <h2 className="mt-10 text-xl font-semibold tracking-tight">Startup case</h2>
+      {c ? (
+        <dl className="mt-4 grid gap-6 sm:grid-cols-2">
+          {([
+            ["Product", c.product],
+            ["Buyer", c.buyer],
+            ["Competitors", c.competitors],
+            ["Distance to market", c.distance_to_market],
+            ["Risks", c.risks],
+            ["What's unverified", c.unverified],
+          ] as const).map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt>
+              <dd className="mt-1.5 text-sm leading-relaxed">{value ?? "—"}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="mt-3 text-sm text-muted">No case written yet.</p>
+      )}
 
       <h2 className="mt-10 text-xl font-semibold tracking-tight">Possible intro paths</h2>
       {intros.length ? (
