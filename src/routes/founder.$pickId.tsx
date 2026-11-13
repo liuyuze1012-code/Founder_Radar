@@ -2,8 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getPickDetail } from "@/lib/data.functions";
 import { Card } from "@heroui/react";
-import { ArrowLeft, ExternalLink } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ArrowLeft, ChevronDown, ExternalLink } from "lucide-react";
 import {
   ActionChip,
   LaneBadge,
@@ -125,12 +124,12 @@ function Founder() {
         <p className="mt-3 text-sm text-muted">No case written yet.</p>
       )}
 
-      <Accordion type="multiple" className="mt-10 border-t border-border">
+      <div className="mt-10 border-t border-border">
         {scores.map(([g, label, v, cov]) => {
           const rows = evidence.filter((e) => e.score_group === g);
           return (
-            <AccordionItem key={g} value={g} className="border-border">
-              <AccordionTrigger className="gap-4 py-5 hover:no-underline">
+            <details key={g} className="group border-b border-border">
+              <summary className="flex cursor-pointer list-none items-center gap-4 py-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0 flex-1">
                   <span className="block text-base font-semibold">{label}</span>
                   <span className="mt-1 block text-xs font-normal text-muted">{cov ?? "Coverage unknown"}</span>
@@ -138,8 +137,9 @@ function Founder() {
                 <span className="shrink-0 text-xl font-semibold tabular-nums">
                   {fmtScore(v)}<span className="text-sm font-normal text-muted">/10</span>
                 </span>
-              </AccordionTrigger>
-              <AccordionContent>
+                <ChevronDown className="size-4 shrink-0 text-muted transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+              </summary>
+              <div className="pb-4 text-sm">
               <ul className="divide-y divide-border">
                 {rows.map((e) => (
                   <li
@@ -188,11 +188,11 @@ function Founder() {
                 ))}
               </ul>
               {!rows.length && <p className="text-sm text-muted">No signals recorded.</p>}
-              </AccordionContent>
-            </AccordionItem>
+              </div>
+            </details>
           );
         })}
-      </Accordion>
+      </div>
 
       <h2 className="mt-10 text-xl font-semibold tracking-tight">Possible intro paths</h2>
       {intros.length ? (
