@@ -34,8 +34,13 @@ function ScanProgress() {
     let cancelled = false;
     (async () => {
       try {
+        const token = sessionStorage.getItem(`scan-token:${scanId}`);
+        if (!token) {
+          setError("This scan can only be continued from the browser that started it.");
+          return;
+        }
         while (!cancelled) {
-          const r = await advance({ data: { scanId } });
+          const r = await advance({ data: { scanId, token } });
           if (cancelled) return;
           setStage(r.stage);
           setCounts(r.counts as Record<string, number>);

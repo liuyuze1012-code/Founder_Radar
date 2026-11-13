@@ -59,6 +59,7 @@ function Setup() {
         data: parsed.data,
       });
       if (!res.ok) return setError(res.error);
+      sessionStorage.setItem(`scan-token:${res.scanId}`, res.token);
       navigate({ to: "/scan/$scanId", params: { scanId: res.scanId } });
     } catch {
       setError("Could not connect to start the scan. Refresh this page and try again.");
