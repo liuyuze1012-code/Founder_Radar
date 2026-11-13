@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
 import { startScan } from "@/lib/scan.functions";
+import { startInput, scanInputError } from "@/lib/scan-input";
 import { REGIONS, REGION_SHORTCUTS } from "@/lib/radar";
 import { Button, Card, Input, Label, TextArea } from "@heroui/react";
 import { Check } from "lucide-react";
@@ -50,17 +51,17 @@ function Setup() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (thesis.trim().length < 3) return setError("Enter a thesis.");
-    if (!regions.length) return setError("Pick at least one region.");
+    const parsed = startInput.safeParse({ thesis, schoolIds: regions, windowDays, laneSizes: lanes, passcode });
+    if (!parsed.success) return setError(scanInputError(parsed.error));
     setBusy(true);
     try {
       const res = await run({
-        data: { thesis, schoolIds: regions, windowDays, laneSizes: lanes, passcode },
+        data: parsed.data,
       });
       if (!res.ok) return setError(res.error);
       navigate({ to: "/scan/$scanId", params: { scanId: res.scanId } });
     } catch {
-      setError("Something went wrong starting the scan.");
+      setError("Could not connect to start the scan. Refresh this page and try again.");
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { startInput, scanInputError } from "./scan-input";
 
 function safeEqual(a: string, b: string) {
   const ea = new TextEncoder().encode(a);
@@ -9,21 +10,11 @@ function safeEqual(a: string, b: string) {
   return diff === 0;
 }
 
-const startInput = z.object({
-  thesis: z.string().trim().min(3).max(500),
-  schoolIds: z.array(z.string().max(50)).min(1).max(20),
-  windowDays: z.number().int().min(1).max(365),
-  laneSizes: z.object({
-    pre_intent: z.number().int().min(0).max(50),
-    exploring: z.number().int().min(0).max(50),
-    already_moving: z.number().int().min(0).max(50),
-  }),
-  passcode: z.string().max(200),
-});
-
 export const startScan = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => startInput.parse(d))
-  .handler(async ({ data }) => {
+  .inputValidator((d: unknown) => startInput.safeParse(d))
+  .handler(async ({ data: parsed }) => {
+    if (!parsed.success) return { ok: false as const, error: scanInputError(parsed.error) };
+    const data = parsed.data;
     const expected = process.env["SCAN_PASSCODE"];
     if (!expected) return { ok: false as const, error: "Scanning is not configured yet (no passcode set)." };
     if (!safeEqual(data.passcode, expected)) return { ok: false as const, error: "Wrong passcode." };
@@ -34,13 +25,19 @@ export const startScan = createServerFn({ method: "POST" })
       .insert({ text: data.thesis, school_ids: data.schoolIds, window_days: data.windowDays, lane_sizes: data.laneSizes })
       .select("id")
       .single();
-    if (tErr || !thesis) throw new Error("Could not save thesis");
+    if (tErr || !thesis) {
+      console.error("startScan thesis insert failed", tErr?.code, tErr?.message);
+      return { ok: false as const, error: "Could not save your thesis. Please try again." };
+    }
     const { data: scan, error: sErr } = await supabaseAdmin
       .from("scans")
       .insert({ thesis_id: thesis.id, status: "queued", stage: "translate", counts: {}, rules_version: "pending", is_sample: false })
       .select("id")
       .single();
-    if (sErr || !scan) throw new Error("Could not create scan");
+    if (sErr || !scan) {
+      console.error("startScan scan insert failed", sErr?.code, sErr?.message);
+      return { ok: false as const, error: "Your thesis was saved, but the scan could not start. Please try again." };
+    }
     return { ok: true as const, scanId: scan.id };
   });
 
