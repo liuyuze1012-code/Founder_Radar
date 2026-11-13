@@ -1,13 +1,14 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { ArrowLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Alert } from "@heroui/react";
 import { getReport } from "@/lib/data.functions";
 import { LANES, regionCodes, regionNames } from "@/lib/radar";
 import { FounderCard, SampleBanner, Tag, laneUi } from "@/components/radar/bits";
 import { PeopleTable } from "@/components/radar/PeopleTable";
 
 const reportQuery = (scanId: string) =>
-  queryOptions({ queryKey: ["report", scanId], queryFn: () => getReport({ data: { scanId } }) });
+  queryOptions({ queryKey: ["report", scanId], queryFn: () => getReport({ data: { scanId } }), staleTime: 300_000, retry: false });
 
 export const Route = createFileRoute("/report/$scanId")({
   loader: async ({ context, params }) => {
@@ -19,6 +20,10 @@ export const Route = createFileRoute("/report/$scanId")({
     meta: [
       { title: `${loaderData?.thesis ?? "Report"} — Founder Radar` },
       { name: "description", content: "The people this scan found, sorted into three lanes." },
+      { property: "og:title", content: `${loaderData?.thesis ?? "Report"} — Founder Radar` },
+      { property: "og:description", content: "Research ideas and selection evidence from this Founder Radar scan." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   notFoundComponent: () => (
@@ -67,6 +72,15 @@ function Report() {
   return (
     <div>
       <SampleBanner show={data.scan.is_sample} />
+      {data.summaryError && (
+        <Alert status="warning" className="mb-6">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Idea summaries unavailable</Alert.Title>
+            <Alert.Description>{data.summaryError}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
       <Link
         to="/"
         className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
@@ -127,7 +141,7 @@ function Report() {
               <p className="mt-1 text-sm text-muted">{lane.blurb}</p>
               <div className="mt-4 space-y-4">
                 {picks.map((p) => (
-                  <FounderCard key={p.id} pick={p} />
+                  <FounderCard key={p.id} pick={p} reportSummary />
                 ))}
                 {picks.length < size && (
                   <p className="rounded-2xl border border-dashed border-border px-4 py-3 text-sm text-muted">

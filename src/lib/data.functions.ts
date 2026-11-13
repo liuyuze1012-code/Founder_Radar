@@ -160,7 +160,28 @@ export const getReport = createServerFn({ method: "GET" })
       .select(PICK_SELECT)
       .eq("scan_id", scan.id)
       .order("rank");
-    return { scan, picks: picks ?? [] };
+    const { data: cases } = await db
+      .from("cases")
+      .select("person_id, product")
+      .eq("scan_id", scan.id);
+    const { reportSummaries } = await import("./report-summary.server");
+    const digest = (picks ?? []).filter((pick) => pick.in_digest);
+    let summaries = new Map<string, { idea: string; qualification: string }>();
+    let summaryError: string | null = null;
+    try {
+      summaries = await reportSummaries(digest.map((pick) => ({
+        id: pick.id,
+        product: cases?.find((entry) => entry.person_id === pick.person_id)?.product ?? null,
+        why: pick.why,
+      })));
+    } catch (error) {
+      summaryError = error instanceof Error ? error.message : "Card summaries could not be generated.";
+    }
+    return {
+      scan,
+      summaryError,
+      picks: (picks ?? []).map((pick) => ({ ...pick, cardSummary: summaries.get(pick.id) ?? null })),
+    };
   });
 
 type PersonPick = {

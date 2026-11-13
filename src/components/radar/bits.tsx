@@ -12,6 +12,7 @@ export type PickRow = {
   lane: string | null;
   action: string | null;
   why: string | null;
+  cardSummary?: { idea: string; qualification: string } | null;
   research_score: number | string | null;
   propensity_score: number | string | null;
   timing_score: number | string | null;
@@ -210,7 +211,7 @@ export function TrackButton({ pick, size = "sm" }: { pick: PickRow; size?: "sm" 
   );
 }
 
-export function FounderCard({ pick }: { pick: PickRow }) {
+export function FounderCard({ pick, reportSummary = false }: { pick: PickRow; reportSummary?: boolean }) {
   const name = pick.people?.name ?? "Researcher";
   return (
     <Card className="relative gap-4 p-5 transition-shadow duration-200 hover:shadow-lg">
@@ -234,7 +235,20 @@ export function FounderCard({ pick }: { pick: PickRow }) {
         t={pick.timing_score}
         lane={pick.lane}
       />
-      <p className="text-sm leading-relaxed text-foreground/90">{pick.why}</p>
+      {reportSummary ? (
+        <div className="space-y-2 text-sm leading-relaxed">
+          <p className="font-medium text-foreground">
+            <span className="text-muted">Idea · </span>
+            {pick.cardSummary?.idea ?? "Idea summary unavailable"}
+          </p>
+          <p className="text-foreground/90">
+            <span className="font-medium text-muted">Why selected · </span>
+            {pick.cardSummary?.qualification ?? pick.why ?? "Selection evidence unavailable"}
+          </p>
+        </div>
+      ) : (
+        <p className="text-sm leading-relaxed text-foreground/90">{pick.why}</p>
+      )}
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
           {(pick.people?.tracks ?? []).map((t) => (
