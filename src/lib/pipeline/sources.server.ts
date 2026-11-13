@@ -214,6 +214,13 @@ export type AuthorProfile = {
   firstYear: number | null;
   worksThisYear: number | null;
   worksLastYear: number | null;
+  /** US companies the person's own papers list as their affiliation. */
+  companies: { id: string; name: string; lastYear: number }[];
+  /**
+   * True when the profile shows affiliations in three or more countries in the last three years.
+   * That usually means two people with the same name were merged into one profile.
+   */
+  mixed: boolean;
 };
 
 export async function authorProfile(authorId: string): Promise<AuthorProfile> {
@@ -235,7 +242,39 @@ export async function authorProfile(authorId: string): Promise<AuthorProfile> {
     firstYear: years.length ? Math.min(...years) : null,
     worksThisYear: byYear.get(year) ?? null,
     worksLastYear: byYear.get(year - 1) ?? null,
+    mixed:
+      new Set(
+        (a.affiliations ?? [])
+          .filter((x: any) => (x.years ?? []).some((y: number) => y >= year - 3))
+          .map((x: any) => x.institution?.country_code)
+          .filter(Boolean),
+      ).size >= 3,
+    companies: (a.affiliations ?? [])
+      .filter(
+        (x: any) =>
+          x.institution?.type === "company" &&
+          x.institution?.country_code === "US" &&
+          (x.years ?? []).length,
+      )
+      .map((x: any) => ({
+        id: shortId(x.institution.id),
+        name: x.institution.display_name ?? "",
+        lastYear: Math.max(...x.years),
+      })),
   };
+}
+
+/** Publication counts for companies, used to tell a small venture from a large employer. */
+export async function companySizes(ids: string[]): Promise<Map<string, number>> {
+  const data = await getJson(
+    "OpenAlex",
+    openalexUrl("/institutions", {
+      filter: `openalex:${ids.slice(0, 25).join("|")}`,
+      select: "id,works_count",
+      per_page: "25",
+    }),
+  );
+  return new Map((data.results ?? []).map((i: any) => [shortId(i.id), i.works_count ?? 0]));
 }
 
 export type TopWork = {
@@ -245,8 +284,14 @@ export type TopWork = {
   citedBy: number;
   fwci: number | null;
   top10: boolean;
+  /** Company coauthors, counted only on papers with a short author list. */
   companyCoauthors: string[];
+  /** Where this paper lists the person themselves. */
+  ownInstitutions: { id: string; name: string }[];
 };
+
+/** A coauthor on a 35-author consortium paper is not a working relationship. */
+const MAX_AUTHORS_FOR_COAUTHOR_SIGNAL = 15;
 
 /** A person's most cited works of the last three years. */
 export async function topRecentWorks(authorId: string): Promise<TopWork[]> {
@@ -262,7 +307,8 @@ export async function topRecentWorks(authorId: string): Promise<TopWork[]> {
   );
   return (data.results ?? []).map((w: any): TopWork => {
     const companies = new Set<string>();
-    for (const au of w.authorships ?? []) {
+    const small = (w.authorships ?? []).length <= MAX_AUTHORS_FOR_COAUTHOR_SIGNAL;
+    for (const au of small ? (w.authorships ?? []) : []) {
       if (shortId(au.author?.id) === authorId) continue;
       for (const i of au.institutions ?? [])
         if (i.type === "company" && i.display_name) companies.add(i.display_name);
@@ -275,6 +321,10 @@ export async function topRecentWorks(authorId: string): Promise<TopWork[]> {
       fwci: typeof w.fwci === "number" ? w.fwci : null,
       top10: !!w.citation_normalized_percentile?.is_in_top_10_percent,
       companyCoauthors: [...companies],
+      ownInstitutions: (w.authorships ?? [])
+        .filter((au: any) => shortId(au.author?.id) === authorId)
+        .flatMap((au: any) => au.institutions ?? [])
+        .map((i: any) => ({ id: shortId(i.id), name: i.display_name ?? "" })),
     };
   });
 }

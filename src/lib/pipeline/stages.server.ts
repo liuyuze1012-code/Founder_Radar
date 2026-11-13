@@ -437,7 +437,12 @@ async function resolve(db: Db, scan: Scan): Promise<Step> {
     );
     const people = new Map<
       string,
-      { row: Record<string, unknown>; tracks: Set<string>; itemIds: string[] }
+      {
+        row: Record<string, unknown>;
+        tracks: Set<string>;
+        itemIds: string[];
+        role: "lead author" | "senior author";
+      }
     >();
     for (const it of papers) {
       const pp = peopleFromPaper(it.raw?.authors ?? [], schools);
@@ -456,7 +461,9 @@ async function resolve(db: Db, scan: Scan): Promise<Step> {
         },
         tracks: new Set<string>(),
         itemIds: [],
+        role: pp.role,
       };
+      if (pp.role === "lead author") entry.role = "lead author";
       const track = trackForField(it.raw?.field);
       if (track) entry.tracks.add(track);
       entry.itemIds.push(it.id);
@@ -478,9 +485,13 @@ async function resolve(db: Db, scan: Scan): Promise<Step> {
         p.itemIds.map((itemId) => ({
           person_id: idOf.get(oid),
           item_id: itemId,
-          role: "lead author",
+          role: p.role,
           confidence: "high",
-          reasons: ["First listed author at a selected school"],
+          reasons: [
+            p.role === "lead author"
+              ? "First author, at a selected school"
+              : "Senior (last) author at a selected school; the first author is elsewhere",
+          ],
         })),
       );
       must(
@@ -653,6 +664,18 @@ async function enrichOne(
   }));
   await db.from("evidence").delete().eq("scan_id", scan.id).eq("person_id", person.id);
   must(await db.from("evidence").insert(rows).select("id"), "Could not save evidence");
+  if (facts.profileMixed) {
+    await db
+      .from("people")
+      .update({
+        identity_confidence: "medium",
+        identity_reasons: [
+          "Author ID on the paper record",
+          "Profile shows affiliations in several countries at once and may combine more than one person",
+        ],
+      })
+      .eq("id", person.id);
+  }
   if (facts.firstYear != null)
     await db.from("people").update({ first_year: facts.firstYear }).eq("id", person.id);
 }

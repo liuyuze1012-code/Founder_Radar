@@ -29,6 +29,10 @@ export type PersonFacts = {
   /** Count of citing works with a company author. undefined = lookup failed. */
   companyCitations?: number | null | undefined;
   companyCoauthors?: string[];
+  /** Companies listed as the person's own affiliation on their papers. undefined = lookup failed. */
+  ownCompanies?: { name: string; lastYear: number; small: boolean }[];
+  /** The profile probably combines more than one person, so its history is not used. */
+  profileMixed?: boolean;
   /** Commercialization awards led by the person. undefined = lookup failed. */
   ownAwards?: {
     title: string;
@@ -61,16 +65,14 @@ export function buildSignals(f: PersonFacts): Signal[] {
   ) => s.push({ group, type, label, value, points, max, status: "observed", ...extra });
   const na = (group: Group, type: string, label: string, value: string) =>
     s.push({ group, type, label, value, points: null, max: null, status: "not_applicable" });
-  const unknown = (group: Group, type: string, label: string) =>
-    s.push({
-      group,
-      type,
-      label,
-      value: "Lookup failed",
-      points: null,
-      max: null,
-      status: "unknown",
-    });
+  // An unknown signal keeps its maximum, so missing data lowers the score instead of inflating it.
+  const unknown = (
+    group: Group,
+    type: string,
+    label: string,
+    max: number,
+    value = "Lookup failed",
+  ) => s.push({ group, type, label, value, points: null, max, status: "unknown" });
 
   // ---- Research potential
   const fit = f.fit ?? 0;
@@ -100,10 +102,11 @@ export function buildSignals(f: PersonFacts): Signal[] {
     1,
   );
 
+  const TOO_NEW = "No work older than 6 months, so no citation data yet";
   if (f.bestWork === undefined)
-    unknown("research", "field_citations", "Citations versus the field");
+    unknown("research", "field_citations", "Citations versus the field", 2);
   else if (f.bestWork === null)
-    na("research", "field_citations", "Citations versus the field", "No work older than 6 months");
+    unknown("research", "field_citations", "Citations versus the field", 2, TOO_NEW);
   else {
     const w = f.bestWork;
     const pts = w.top10 ? 2 : (w.fwci ?? 0) > 1 ? 1 : 0;
@@ -124,14 +127,9 @@ export function buildSignals(f: PersonFacts): Signal[] {
   }
 
   if (f.bestWork === null)
-    na(
-      "research",
-      "company_citations",
-      "Cited by company researchers",
-      "No work older than 6 months",
-    );
+    unknown("research", "company_citations", "Cited by company researchers", 2, TOO_NEW);
   else if (f.companyCitations === undefined || f.bestWork === undefined)
-    unknown("research", "company_citations", "Cited by company researchers");
+    unknown("research", "company_citations", "Cited by company researchers", 2);
   else {
     const n = f.companyCitations ?? 0;
     obs(
@@ -146,7 +144,7 @@ export function buildSignals(f: PersonFacts): Signal[] {
   }
 
   // ---- Founder propensity
-  if (f.ownAwards === undefined) unknown("propensity", "icorps", "I-Corps lead");
+  if (f.ownAwards === undefined) unknown("propensity", "icorps", "I-Corps lead", 3);
   else {
     const ic = f.ownAwards
       .filter((a) => a.kind === "icorps" && a.confidence === "high")
@@ -160,21 +158,48 @@ export function buildSignals(f: PersonFacts): Signal[] {
     else obs("propensity", "icorps", "I-Corps lead", "None found", 0, 3);
   }
 
+  const CO_LABEL =
+    "Coauthored with a company researcher (last 3 years, papers of 15 authors or fewer)";
   const co = f.companyCoauthors;
-  if (co === undefined)
-    unknown("propensity", "company_coauthor", "Coauthor at a company (last 3 years)");
+  if (co === undefined) unknown("propensity", "company_coauthor", CO_LABEL, 2);
   else
     obs(
       "propensity",
       "company_coauthor",
-      "Coauthor at a company (last 3 years)",
+      CO_LABEL,
       co.length ? co.slice(0, 3).join(", ") : "None found",
       co.length ? 2 : 0,
       2,
     );
 
+  const IND_LABEL = "Has held a company affiliation on their own papers";
+  const own = f.ownCompanies;
+  if (own === undefined)
+    unknown(
+      "propensity",
+      "industry_experience",
+      IND_LABEL,
+      2,
+      f.profileMixed ? "Not used: profile may combine more than one person" : undefined,
+    );
+  else
+    obs(
+      "propensity",
+      "industry_experience",
+      IND_LABEL,
+      own.length
+        ? [...own]
+            .sort((a, b) => b.lastYear - a.lastYear)
+            .slice(0, 3)
+            .map((c) => `${c.name} (${c.lastYear})`)
+            .join(", ")
+        : "None found",
+      own.length ? 2 : 0,
+      2,
+    );
+
   if (f.labHead === undefined)
-    unknown("propensity", "lab_head_awards", "Lab head has I-Corps or a small-business grant");
+    unknown("propensity", "lab_head_awards", "Lab head has I-Corps or a small-business grant", 2);
   else if (f.labHead === null)
     na(
       "propensity",
@@ -207,7 +232,13 @@ export function buildSignals(f: PersonFacts): Signal[] {
 
   // ---- Timing
   if (f.firstYear === undefined)
-    unknown("timing", "career_stage", "Years since first year on record");
+    unknown(
+      "timing",
+      "career_stage",
+      "Years since first year on record",
+      2,
+      f.profileMixed ? "Not used: profile may combine more than one person" : undefined,
+    );
   else if (f.firstYear === null)
     na("timing", "career_stage", "Years since first year on record", "No history on record");
   else {
@@ -223,7 +254,7 @@ export function buildSignals(f: PersonFacts): Signal[] {
   }
 
   if (f.worksThisYear === undefined)
-    unknown("timing", "output_trend", "More works this year than last");
+    unknown("timing", "output_trend", "More works this year than last", 1);
   else if (f.worksThisYear === null || f.worksLastYear == null)
     na("timing", "output_trend", "More works this year than last", "No yearly counts");
   else
@@ -240,7 +271,7 @@ export function buildSignals(f: PersonFacts): Signal[] {
     .filter((a) => a.confidence === "high" && monthsSince(a.date) <= 6)
     .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))[0];
   if (f.ownAwards === undefined)
-    unknown("timing", "recent_event", "Qualifying event in the last 6 months");
+    unknown("timing", "recent_event", "Qualifying event in the last 6 months", 2);
   else
     obs(
       "timing",
@@ -270,6 +301,39 @@ export function buildSignals(f: PersonFacts): Signal[] {
       confidence: "high",
     });
   }
+  if (f.profileMixed) {
+    s.push({
+      group: "lane",
+      type: "profile_mixed",
+      label: "Profile may combine more than one person",
+      value:
+        "Affiliations in several countries at once; career history and company ties were not used",
+      points: null,
+      max: null,
+      status: "observed",
+      confidence: "medium",
+    });
+  }
+  // A small company on the person's own papers is a sign of a venture, so they are not Pre-intent.
+  const ventures = (f.ownCompanies ?? [])
+    .filter((c) => c.small)
+    .sort((a, b) => b.lastYear - a.lastYear);
+  const venture = ventures[0];
+  if (venture) {
+    const recent = venture.lastYear >= new Date().getUTCFullYear() - 5;
+    s.push({
+      group: "lane",
+      type: recent ? "lane_moving" : "lane_company_past",
+      label: recent
+        ? "Listed at a small company on their own papers in the last 5 years"
+        : "Past affiliation with a small company on their own papers",
+      value: `${venture.name} (${venture.lastYear})`,
+      points: null,
+      max: null,
+      status: "observed",
+      confidence: "high",
+    });
+  }
   for (const a of (f.ownAwards ?? []).filter((x) => x.confidence !== "high").slice(0, 2)) {
     s.push({
       group: "lane",
@@ -292,13 +356,17 @@ export const NURTURE_MIN = 3;
 
 export type GroupScore = { score: number; coverage: string; coveragePct: number };
 
-/** Score = 10 × points earned ÷ points possible over observed signals. Coverage = observed ÷ applicable. */
+/**
+ * Score = 10 × points earned ÷ points possible. Signals that do not apply are left out.
+ * Signals with no data yet stay in the total, so thin evidence cannot produce a top score.
+ * Coverage = signals with data ÷ signals that apply.
+ */
 export function scoreGroup(signals: Signal[], group: Group): GroupScore {
   const g = signals.filter((x) => x.group === group);
   const observed = g.filter((x) => x.status === "observed");
   const applicable = g.filter((x) => x.status !== "not_applicable");
   const earned = observed.reduce((n, x) => n + (x.points ?? 0), 0);
-  const possible = observed.reduce((n, x) => n + (x.max ?? 0), 0);
+  const possible = applicable.reduce((n, x) => n + (x.max ?? 0), 0);
   const score = possible > 0 ? Math.round((earned / possible) * 100) / 10 : 0;
   const pct = applicable.length ? observed.length / applicable.length : 0;
   return {
@@ -330,11 +398,15 @@ export function judge(signals: Signal[]): Verdict {
   const has = (type: string) =>
     signals.some((x) => x.type === type && x.status === "observed" && (x.points ?? 0) > 0);
 
-  const exploring = signals.some((x) => x.type === "lane_exploring");
-  const lane: Lane = exploring ? "exploring" : "pre_intent";
-  const laneReason = exploring
-    ? "Led an I-Corps award in the last 3 years"
-    : "No I-Corps or company signal found in the monitored sources";
+  const laneSignal = (type: string) => signals.find((x) => x.type === type);
+  const moving = laneSignal("lane_moving");
+  const exploring = laneSignal("lane_exploring") ?? laneSignal("lane_company_past");
+  const lane: Lane = moving ? "already_moving" : exploring ? "exploring" : "pre_intent";
+  const laneReason = moving
+    ? `${moving.label}: ${moving.value}`
+    : exploring
+      ? `${exploring.label}: ${exploring.value}`
+      : "No I-Corps or company signal found in the monitored sources";
 
   const earning = signals.filter((x) => x.status === "observed" && (x.points ?? 0) > 0).length;
   let below: string | null = null;
@@ -343,7 +415,12 @@ export function judge(signals: Signal[]): Verdict {
     if (research.score < 5) below = `Research potential ${research.score.toFixed(1)} is under 5`;
     else if (research.coveragePct < 0.5)
       below = "Research potential is based on under half of its signals";
-    else if (!has("company_coauthor") && !has("lab_head_awards") && !has("icorps"))
+    else if (
+      !has("company_coauthor") &&
+      !has("lab_head_awards") &&
+      !has("icorps") &&
+      !has("industry_experience")
+    )
       below = "No signal about the person beyond the paper";
   } else if (lane === "exploring") {
     if (research.score < 4) below = `Research potential ${research.score.toFixed(1)} is under 4`;
@@ -402,7 +479,8 @@ const WHY: Record<string, (s: Signal) => string> = {
       : "recent work cited above its field average",
   company_citations: (s) => `${s.value.split(" ")[0]} company-authored works cite their research`,
   icorps: () => "has led an I-Corps team",
-  company_coauthor: (s) => `publishes with ${s.value.split(",")[0]}`,
+  company_coauthor: (s) => `has coauthored with ${s.value.split(",")[0]}`,
+  industry_experience: (s) => `has been affiliated with ${s.value.split(" (")[0]}`,
   lab_head_awards: () => "lab head has commercialization grants",
   multi_source: () => "found through more than one source",
   career_stage: () => "at a career stage where people often move",

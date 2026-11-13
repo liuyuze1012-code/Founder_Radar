@@ -2,11 +2,18 @@
 
 import { schoolByOrgName, type SchoolInfo } from "./config";
 import type { RawAuthor } from "./sources.server";
-import { authorProfile, awardsByLead, companyCitations, topRecentWorks } from "./sources.server";
+import {
+  authorProfile,
+  awardsByLead,
+  companyCitations,
+  companySizes,
+  topRecentWorks,
+} from "./sources.server";
 import type { PersonFacts } from "./score";
 
 export type PaperPeople = {
   candidate: RawAuthor;
+  role: "lead author" | "senior author";
   school: SchoolInfo;
   labHead: RawAuthor | null;
   coauthors: RawAuthor[];
@@ -24,26 +31,27 @@ function schoolOfAuthor(a: RawAuthor, schools: SchoolInfo[]): SchoolInfo | null 
 }
 
 /**
- * Likely founder = first author if they are at a selected school, otherwise the first listed author who is.
- * Lab head = last author on a paper with three or more authors.
+ * Likely founder = the first author, if they are at a selected school. Otherwise the last (senior)
+ * author, if they are. A middle author is never picked: they did not lead the work.
+ * Lab head = last author, when the paper has two or more authors and the candidate is the first.
  */
 export function peopleFromPaper(authors: RawAuthor[], schools: SchoolInfo[]): PaperPeople | null {
   const withId = authors.filter((a) => a.id && a.name);
-  let candidate: RawAuthor | null = null;
-  let school: SchoolInfo | null = null;
-  for (const a of withId) {
-    const s = schoolOfAuthor(a, schools);
-    if (s) {
-      candidate = a;
-      school = s;
-      break;
-    }
-  }
-  if (!candidate || !school) return null;
+  const first = withId[0];
   const last = withId[withId.length - 1];
-  const labHead = withId.length >= 3 && last && last.id !== candidate.id ? last : null;
-  const coauthors = withId.filter((a) => a.id !== candidate!.id && a.id !== labHead?.id);
-  return { candidate, school, labHead, coauthors };
+  if (!first || !last) return null;
+  const firstSchool = schoolOfAuthor(first, schools);
+  if (firstSchool) {
+    const labHead = withId.length >= 2 && last.id !== first.id ? last : null;
+    const coauthors = withId.filter((a) => a.id !== first.id && a.id !== labHead?.id);
+    return { candidate: first, role: "lead author", school: firstSchool, labHead, coauthors };
+  }
+  const lastSchool = last.id !== first.id ? schoolOfAuthor(last, schools) : null;
+  if (lastSchool) {
+    const coauthors = withId.filter((a) => a.id !== last.id);
+    return { candidate: last, role: "senior author", school: lastSchool, labHead: null, coauthors };
+  }
+  return null;
 }
 
 export type EnrichInput = {
@@ -62,25 +70,55 @@ export type EnrichInput = {
   knownAwards: NonNullable<PersonFacts["ownAwards"]>;
 };
 
+/** A company with this many publications or fewer is treated as a small venture, not a large employer. */
+const SMALL_COMPANY_MAX_WORKS = 1500;
+
 const olderThanSixMonths = (iso: string | null) =>
   !!iso && Date.now() - new Date(iso).getTime() > 183 * 86400000;
 
-/** Up to five outside requests: profile, top works, company citations, own awards, lab head awards. */
+/** Up to six outside requests: profile, company sizes, top works, company citations, own awards, lab head awards. */
 export async function gatherFacts(input: EnrichInput): Promise<PersonFacts> {
   const facts: PersonFacts = { ...input.screening, sources: input.sources };
 
-  const [profile, works, own, head] = await Promise.all([
+  const [profile, allWorks, own, head] = await Promise.all([
     authorProfile(input.authorId).catch(() => undefined),
     topRecentWorks(input.authorId).catch(() => undefined),
     awardsByLead(input.name).catch(() => undefined),
     input.labHead ? awardsByLead(input.labHead.name).catch(() => undefined) : Promise.resolve(null),
   ]);
 
-  if (profile) {
+  if (profile?.mixed) {
+    // Likely two people in one profile: do not trust its history or its company affiliations.
+    facts.profileMixed = true;
+    facts.worksThisYear = profile.worksThisYear;
+    facts.worksLastYear = profile.worksLastYear;
+  } else if (profile) {
     facts.firstYear = profile.firstYear;
     facts.worksThisYear = profile.worksThisYear;
     facts.worksLastYear = profile.worksLastYear;
+    if (!profile.companies.length) facts.ownCompanies = [];
+    else {
+      const sizes = await companySizes(profile.companies.map((c) => c.id)).catch(() => undefined);
+      if (sizes) {
+        facts.ownCompanies = profile.companies.map((c) => ({
+          name: c.name,
+          lastYear: c.lastYear,
+          small: (sizes.get(c.id) ?? 0) <= SMALL_COMPANY_MAX_WORKS,
+        }));
+      }
+    }
   }
+
+  // In a merged profile, keep only the papers that list the person at their own school.
+  const school = input.school;
+  const works =
+    allWorks && profile?.mixed && school
+      ? allWorks.filter((w) =>
+          w.ownInstitutions.some(
+            (i) => school.openalex.includes(i.id) || !!schoolByOrgName(i.name, [school]),
+          ),
+        )
+      : allWorks;
 
   if (works) {
     facts.companyCoauthors = [...new Set(works.flatMap((w) => w.companyCoauthors))];
