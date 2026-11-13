@@ -51,7 +51,7 @@ export type RawAuthor = {
 };
 
 export type CollectedItem = {
-  source: "paper" | "grant";
+  source: "paper" | "grant" | "repo";
   source_id: string;
   doi: string | null;
   title: string | null;
@@ -385,16 +385,153 @@ export async function findAuthorsAtSchool(
 /** The US institution a free-text organization name refers to, for whole-US mode. */
 export async function lookupInstitution(
   name: string,
-): Promise<{ id: string; name: string } | null> {
+): Promise<{ id: string; name: string; type: string | null } | null> {
   const data = await getJson(
     "OpenAlex",
     openalexUrl("/institutions", {
       search: name.replace(/[^A-Za-z ]+/g, " "),
       filter: "country_code:US",
-      select: "id,display_name",
+      select: "id,display_name,type",
       per_page: "1",
     }),
   );
   const hit = (data.results ?? [])[0];
-  return hit ? { id: shortId(hit.id), name: hit.display_name ?? name } : null;
+  return hit
+    ? { id: shortId(hit.id), name: hit.display_name ?? name, type: hit.type ?? null }
+    : null;
+}
+
+// ---------------------------------------------------------------- GitHub
+
+const GITHUB = "https://api.github.com";
+
+async function github(path: string, raw = false): Promise<any> {
+  const token = process.env["GITHUB_TOKEN"];
+  const res = await fetch(`${GITHUB}${path}`, {
+    headers: {
+      Accept: raw ? "application/vnd.github.raw" : "application/vnd.github+json",
+      "User-Agent": "founder-radar",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) throw new SourceError("GitHub", res.status);
+  return raw ? res.text() : res.json();
+}
+
+/** The arXiv paper a repository's README points to first, if any. Research code usually links its paper. */
+export async function repoArxivId(fullName: string): Promise<string | null> {
+  const readme: string = await github(`/repos/${fullName}/readme`, true);
+  const m = readme.slice(0, 20000).match(/arxiv\.org\/(?:abs|pdf)\/(\d{4}\.\d{4,5})/i);
+  return m ? m[1]! : null;
+}
+
+/** Recently created repositories on a topic that other people have starred. */
+export async function searchRepos(opts: {
+  term: string;
+  since: string;
+  minStars: number;
+  perPage: number;
+}): Promise<CollectedItem[]> {
+  const q = `${opts.term} created:>=${opts.since} stars:>=${opts.minStars} fork:false`;
+  const data = await github(
+    `/search/repositories?q=${encodeURIComponent(q)}&sort=stars&order=desc&per_page=${Math.min(50, opts.perPage)}`,
+  );
+  // Curated lists and surveys link other people's papers, so they do not point to one builder.
+  const isList = (r: any) =>
+    /awesome|curated|survey|paper[-_ ]?list|reading[-_ ]?list/i.test(
+      `${r.name ?? ""} ${r.description ?? ""}`,
+    );
+  const repos = (data.items ?? []).filter((r: any) => !isList(r));
+  return repos.map((r: any): CollectedItem => ({
+    source: "repo",
+    source_id: `gh:${r.full_name}`,
+    doi: null,
+    title: r.full_name ?? null,
+    summary:
+      [
+        r.description ?? "",
+        (r.topics ?? []).length ? `Topics: ${(r.topics ?? []).slice(0, 8).join(", ")}` : "",
+        r.language ? `Language: ${r.language}` : "",
+        `Stars: ${r.stargazers_count ?? 0}`,
+      ]
+        .filter(Boolean)
+        .join(". ") || null,
+    item_date: r.created_at ? String(r.created_at).slice(0, 10) : null,
+    url: r.html_url ?? null,
+    raw: {
+      kind: "repo",
+      owner: r.owner?.login ?? "",
+      ownerType: r.owner?.type ?? "User",
+      stars: r.stargazers_count ?? 0,
+      term: opts.term,
+    },
+  }));
+}
+
+export type RepoOwner = {
+  login: string;
+  name: string | null;
+  company: string | null;
+  location: string | null;
+  bio: string | null;
+};
+
+/** The person behind a repository: its owner, or the top contributor when an organization owns it. */
+export async function repoOwnerProfile(
+  login: string,
+  ownerType: string,
+  fullName: string,
+): Promise<RepoOwner | null> {
+  let user = login;
+  if (ownerType === "Organization") {
+    const contributors = await github(`/repos/${fullName}/contributors?per_page=1`);
+    user = contributors?.[0]?.login ?? "";
+  }
+  if (!user) return null;
+  const u = await github(`/users/${encodeURIComponent(user)}`);
+  return {
+    login: u.login ?? user,
+    name: u.name ?? null,
+    company: u.company ?? null,
+    location: u.location ?? null,
+    bio: u.bio ?? null,
+  };
+}
+
+/** The paper behind an arXiv ID, with its authors. */
+export async function paperByArxiv(
+  arxivId: string,
+): Promise<{ id: string; title: string; field: string | null; authors: RawAuthor[] } | null> {
+  const w = await getJson(
+    "OpenAlex",
+    openalexUrl(`/works/doi:10.48550/arXiv.${arxivId}`, {
+      select: "id,title,authorships,primary_topic",
+    }),
+  ).catch(() => null);
+  if (!w?.id) return null;
+  return {
+    id: shortId(w.id),
+    title: w.title ?? "",
+    field: w.primary_topic?.field?.display_name ?? null,
+    authors: mapAuthors(w.authorships),
+  };
+}
+
+/** Where a researcher is now. New preprints often list no institution, so the profile is the fallback. */
+export async function authorHome(
+  authorId: string,
+): Promise<{ id: string; name: string; country: string | null; type: string | null } | null> {
+  const a = await getJson(
+    "OpenAlex",
+    openalexUrl(`/authors/${authorId}`, { select: "id,last_known_institutions" }),
+  );
+  const i = (a.last_known_institutions ?? [])[0];
+  return i
+    ? {
+        id: shortId(i.id),
+        name: i.display_name ?? "",
+        country: i.country_code ?? null,
+        type: i.type ?? null,
+      }
+    : null;
 }

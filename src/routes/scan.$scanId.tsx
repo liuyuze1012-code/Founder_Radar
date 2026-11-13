@@ -133,7 +133,7 @@ function ScanProgress() {
 
 const STAGE_NOTE: Record<string, string> = {
   translate: "Turning the thesis into search phrases",
-  collect: "Fetching recent papers and grants",
+  collect: "Fetching recent papers, grants and code repositories",
   clean: "Removing duplicates and non-research items",
   screen: "AI reads each record for fit",
   resolve: "Turning records into people",

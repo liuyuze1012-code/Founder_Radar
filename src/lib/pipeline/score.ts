@@ -33,6 +33,8 @@ export type PersonFacts = {
   ownCompanies?: { name: string; lastYear: number; small: boolean; us?: boolean }[];
   /** The profile probably combines more than one person, so its history is not used. */
   profileMixed?: boolean;
+  /** A code repository the scan found and linked to this person. */
+  repo?: { name: string; url: string; stars: number } | null;
   /** Commercialization awards led by the person. undefined = lookup failed. */
   ownAwards?: {
     title: string;
@@ -155,7 +157,30 @@ export function buildSignals(f: PersonFacts): Signal[] {
     );
   }
 
+  if (f.repo) {
+    obs(
+      "research",
+      "code_in_use",
+      "Code in use (a repository the scan found)",
+      `${f.repo.name}: ${f.repo.stars} stars`,
+      f.repo.stars >= 100 ? 2 : f.repo.stars >= 20 ? 1 : 0,
+      2,
+      { url: f.repo.url },
+    );
+  }
+
   // ---- Founder propensity
+  if (f.repo && f.repo.stars >= 20) {
+    obs(
+      "propensity",
+      "built_artifact",
+      "Built code that other people use",
+      `${f.repo.name}: ${f.repo.stars} stars`,
+      2,
+      2,
+      { url: f.repo.url },
+    );
+  }
   if (f.ownAwards === undefined) unknown("propensity", "icorps", "I-Corps lead", 3);
   else {
     const ic = f.ownAwards
@@ -431,7 +456,8 @@ export function judge(signals: Signal[]): Verdict {
       !has("company_coauthor") &&
       !has("lab_head_awards") &&
       !has("icorps") &&
-      !has("industry_experience")
+      !has("industry_experience") &&
+      !has("built_artifact")
     )
       below = "No signal about the person beyond the paper";
   } else if (lane === "exploring") {
@@ -491,6 +517,8 @@ const WHY: Record<string, (s: Signal) => string> = {
       : "recent work cited above its field average",
   company_citations: (s) => `${s.value.split(" ")[0]} company-authored works cite their research`,
   icorps: () => "has led an I-Corps team",
+  code_in_use: (s) => `open-source code with ${s.value.split(": ")[1] ?? "stars"}`,
+  built_artifact: () => "built code other people use",
   company_coauthor: (s) => `has coauthored with ${s.value.split(",")[0]}`,
   industry_experience: (s) => `has been affiliated with ${s.value.split(" (")[0]}`,
   lab_head_awards: () => "lab head has commercialization grants",

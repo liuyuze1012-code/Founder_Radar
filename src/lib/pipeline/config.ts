@@ -1,9 +1,9 @@
 // Pipeline settings. Starting values from the build spec (v3.5); tune on real shortlists.
 
-export const RULES_VERSION = "v3.5-3";
+export const RULES_VERSION = "v3.5-4";
 
 /** Upper bound on records collected per scan. Keeps AI screening cost the same for any region. */
-export const MAX_ITEMS = 240;
+export const MAX_ITEMS = 280;
 /** Search phrases used for the paper search. */
 export const MAX_KEYWORDS = 3;
 export const SCREEN_BATCH = 20;

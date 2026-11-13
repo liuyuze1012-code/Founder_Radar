@@ -6,7 +6,7 @@ import { publicDb } from "@/lib/db.server";
 import { adHocSchool, scopeFor, type SchoolInfo } from "./config";
 import { gatherFacts } from "./enrich.server";
 import { buildSignals, judge } from "./score";
-import { leadLink, paperPeople, type PoolRow } from "./stages.server";
+import { leadLink, paperPeople, repoFact, sourceName, type PoolRow } from "./stages.server";
 
 export type RecheckResult = {
   pickId: string;
@@ -70,7 +70,7 @@ export async function recheckPick(pickId: string): Promise<RecheckResult | null>
       leadTitle: lead.items.title,
       leadUrl: lead.items.url,
     },
-    sources: links.map((l) => (l.items.source === "paper" ? "papers" : "grants")),
+    sources: links.map((l) => sourceName(l.items.source)),
     knownAwards: links
       .filter((l) => l.role === "grant lead")
       .map((l) => ({
@@ -81,6 +81,7 @@ export async function recheckPick(pickId: string): Promise<RecheckResult | null>
         confidence: l.confidence === "high" ? ("high" as const) : ("medium" as const),
       })),
   });
+  facts.repo = repoFact(links);
   const signals = buildSignals(facts);
   const v = judge(signals);
   return {

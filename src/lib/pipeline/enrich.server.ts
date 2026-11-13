@@ -7,8 +7,14 @@ import {
   awardsByLead,
   companyCitations,
   companySizes,
+  findAuthorsAtSchool,
+  lookupInstitution,
+  paperByArxiv,
+  repoArxivId,
+  repoOwnerProfile,
   topRecentWorks,
 } from "./sources.server";
+import { pickCandidate } from "./match";
 import type { PersonFacts } from "./score";
 
 export type PaperPeople = {
@@ -180,4 +186,64 @@ export async function gatherFacts(input: EnrichInput): Promise<PersonFacts> {
   }
 
   return facts;
+}
+
+/**
+ * The researcher behind a code repository, or null when there is no confident match.
+ * First choice: the paper the README links, and that paper's lead author. This is the reliable route.
+ * Fallback: the GitHub profile's real name and stated school.
+ */
+export async function personBehindRepo(
+  fullName: string,
+  ownerLogin: string,
+  ownerType: string,
+  scope: Scope,
+): Promise<{ authorId: string; name: string; school: string; reasons: string[] } | null> {
+  // Route 1: the paper the README links.
+  const arxiv = await repoArxivId(fullName).catch(() => null);
+  if (arxiv) {
+    const paper = await paperByArxiv(arxiv);
+    const lead = paper?.authors.find((a) => a.id && a.name);
+    if (paper && lead) {
+      const reasons = [
+        `Repository README links the paper "${paper.title.slice(0, 80)}"`,
+        "Lead author of that paper",
+      ];
+      const onPaper = peopleFromPaper(paper.authors, scope);
+      if (onPaper?.role === "lead author") {
+        return {
+          authorId: onPaper.candidate.id,
+          name: onPaper.candidate.name,
+          school: onPaper.school.name,
+          reasons,
+        };
+      }
+      // A new preprint with no institution on record is not matched: guessing the author's
+      // school from their name attached the wrong person in testing.
+      return null;
+    }
+  }
+
+  // Route 2: the GitHub profile's real name and stated school.
+  const owner = await repoOwnerProfile(ownerLogin, ownerType, fullName).catch(() => null);
+  const name = owner?.name?.trim() ?? "";
+  if (!owner || name.split(/\s+/).length < 2) return null;
+  const where = [owner.company, owner.bio, owner.location].filter(Boolean).join(" · ");
+  let school = schoolByOrgName(where, scope.schools);
+  if (!school && scope.anyUS && owner.company) {
+    const inst = await lookupInstitution(owner.company).catch(() => null);
+    if (inst && inst.type === "education") school = adHocSchool(inst.name, inst.id);
+  }
+  if (!school || !school.openalex.length) return null;
+  const pick = pickCandidate(
+    name,
+    await findAuthorsAtSchool(name, school.openalex).catch(() => []),
+  );
+  if (!pick) return null;
+  return {
+    authorId: pick.candidate.id,
+    name: pick.candidate.name,
+    school: school.name,
+    reasons: [`GitHub profile ${owner.login} names ${school.name}`, pick.reason],
+  };
 }
