@@ -135,15 +135,21 @@
  * --muted is a text gray and --accent is the brand color.
  */
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.974 0.003 265);
-  --foreground: oklch(0.21 0.02 265);
-  --surface: oklch(1 0 0);
-  --muted: oklch(0.55 0.015 265);
-  --muted-foreground: oklch(0.55 0.015 265);
-  --accent: oklch(0.55 0.21 262);
-  --accent-foreground: oklch(0.99 0 0);
-  --border: oklch(0.915 0.005 265);
+  --radius: 0.625rem;
+  --background: oklch(0.985 0.004 85);
+  --foreground: oklch(0.18 0.005 85);
+  --surface: oklch(0.995 0.002 85);
+  --card: oklch(0.995 0.002 85);
+  --default: oklch(0.95 0.005 85);
+  --muted: oklch(0.5 0.01 85);
+  --muted-foreground: oklch(0.5 0.01 85);
+  --accent: oklch(0.18 0.005 85);
+  --accent-foreground: oklch(0.985 0.004 85);
+  --primary: oklch(0.18 0.005 85);
+  --primary-foreground: oklch(0.985 0.004 85);
+  --border: oklch(0.89 0.006 85);
+  --input: oklch(0.89 0.006 85);
+  --ring: oklch(0.6 0.01 85);
   --lane-pre: oklch(0.52 0.22 295);
   --lane-pre-soft: oklch(0.955 0.035 295);
   --lane-exp: oklch(0.66 0.16 62);
