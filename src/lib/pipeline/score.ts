@@ -30,7 +30,7 @@ export type PersonFacts = {
   companyCitations?: number | null | undefined;
   companyCoauthors?: string[];
   /** Companies listed as the person's own affiliation on their papers. undefined = lookup failed. */
-  ownCompanies?: { name: string; lastYear: number; small: boolean }[];
+  ownCompanies?: { name: string; lastYear: number; small: boolean; us?: boolean }[];
   /** The profile probably combines more than one person, so its history is not used. */
   profileMixed?: boolean;
   /** Commercialization awards led by the person. undefined = lookup failed. */
@@ -102,11 +102,17 @@ export function buildSignals(f: PersonFacts): Signal[] {
     1,
   );
 
-  const TOO_NEW = "No work older than 6 months, so no citation data yet";
+  const TOO_NEW = "No paper they led is older than 6 months, so no citation data yet";
   if (f.bestWork === undefined)
-    unknown("research", "field_citations", "Citations versus the field", 2);
+    unknown("research", "field_citations", "Citations versus the field (a paper they led)", 2);
   else if (f.bestWork === null)
-    unknown("research", "field_citations", "Citations versus the field", 2, TOO_NEW);
+    unknown(
+      "research",
+      "field_citations",
+      "Citations versus the field (a paper they led)",
+      2,
+      TOO_NEW,
+    );
   else {
     const w = f.bestWork;
     const pts = w.top10 ? 2 : (w.fwci ?? 0) > 1 ? 1 : 0;
@@ -118,7 +124,7 @@ export function buildSignals(f: PersonFacts): Signal[] {
     obs(
       "research",
       "field_citations",
-      "Citations versus the field",
+      "Citations versus the field (a paper they led)",
       `${desc}: "${w.title.slice(0, 80)}"`,
       pts,
       2,
@@ -127,15 +133,21 @@ export function buildSignals(f: PersonFacts): Signal[] {
   }
 
   if (f.bestWork === null)
-    unknown("research", "company_citations", "Cited by company researchers", 2, TOO_NEW);
+    unknown(
+      "research",
+      "company_citations",
+      "Cited by company researchers (a paper they led)",
+      2,
+      TOO_NEW,
+    );
   else if (f.companyCitations === undefined || f.bestWork === undefined)
-    unknown("research", "company_citations", "Cited by company researchers", 2);
+    unknown("research", "company_citations", "Cited by company researchers (a paper they led)", 2);
   else {
     const n = f.companyCitations ?? 0;
     obs(
       "research",
       "company_citations",
-      "Cited by company researchers",
+      "Cited by company researchers (a paper they led)",
       `${n} citing work${n === 1 ? "" : "s"} with a company author`,
       n >= 5 ? 2 : n >= 1 ? 1 : 0,
       2,
@@ -316,7 +328,7 @@ export function buildSignals(f: PersonFacts): Signal[] {
   }
   // A small company on the person's own papers is a sign of a venture, so they are not Pre-intent.
   const ventures = (f.ownCompanies ?? [])
-    .filter((c) => c.small)
+    .filter((c) => c.small && c.us !== false)
     .sort((a, b) => b.lastYear - a.lastYear);
   const venture = ventures[0];
   if (venture) {

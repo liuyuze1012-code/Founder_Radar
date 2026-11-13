@@ -112,6 +112,7 @@ export async function gatherFacts(input: EnrichInput): Promise<PersonFacts> {
           name: c.name,
           lastYear: c.lastYear,
           small: (sizes.get(c.id) ?? 0) <= SMALL_COMPANY_MAX_WORKS,
+          us: c.us,
         }));
       }
     }
@@ -129,8 +130,13 @@ export async function gatherFacts(input: EnrichInput): Promise<PersonFacts> {
       : allWorks;
 
   if (works) {
-    facts.companyCoauthors = [...new Set(works.flatMap((w) => w.companyCoauthors))];
-    const best = works.filter((w) => olderThanSixMonths(w.date))[0] ?? null;
+    // A coauthor at the person's own former employer is a colleague, not an outside company tie.
+    const employers = new Set((profile?.companies ?? []).map((c) => c.name));
+    facts.companyCoauthors = [...new Set(works.flatMap((w) => w.companyCoauthors))].filter(
+      (name) => !employers.has(name),
+    );
+    // Citation claims use a paper the person led, never one where they are a middle author.
+    const best = works.filter((w) => w.led && olderThanSixMonths(w.date))[0] ?? null;
     facts.bestWork = best
       ? {
           title: best.title,

@@ -219,11 +219,12 @@ export type AuthorProfile = {
   firstYear: number | null;
   worksThisYear: number | null;
   worksLastYear: number | null;
-  /** US companies the person's own papers list as their affiliation. */
-  companies: { id: string; name: string; lastYear: number }[];
+  /** Companies the person's own papers list as their affiliation. */
+  companies: { id: string; name: string; lastYear: number; us: boolean }[];
   /**
-   * True when the profile shows affiliations in three or more countries in the last three years.
-   * That usually means two people with the same name were merged into one profile.
+   * True when the profile shows affiliations in three or more countries, or at five or more
+   * universities, in the last three years. That usually means two people with the same name were
+   * merged into one profile.
    */
   mixed: boolean;
 };
@@ -247,26 +248,33 @@ export async function authorProfile(authorId: string): Promise<AuthorProfile> {
     firstYear: years.length ? Math.min(...years) : null,
     worksThisYear: byYear.get(year) ?? null,
     worksLastYear: byYear.get(year - 1) ?? null,
-    mixed:
-      new Set(
-        (a.affiliations ?? [])
-          .filter((x: any) => (x.years ?? []).some((y: number) => y >= year - 3))
-          .map((x: any) => x.institution?.country_code)
-          .filter(Boolean),
-      ).size >= 3,
+    mixed: looksMerged(a.affiliations ?? [], year),
     companies: (a.affiliations ?? [])
-      .filter(
-        (x: any) =>
-          x.institution?.type === "company" &&
-          x.institution?.country_code === "US" &&
-          (x.years ?? []).length,
-      )
+      .filter((x: any) => x.institution?.type === "company" && (x.years ?? []).length)
       .map((x: any) => ({
         id: shortId(x.institution.id),
         name: x.institution.display_name ?? "",
         lastYear: Math.max(...x.years),
+        us: x.institution?.country_code === "US",
       })),
   };
+}
+
+/**
+ * Signs that one profile holds two or more people with the same name: affiliations in three or
+ * more countries, or at five or more universities, within the last three years.
+ */
+export function looksMerged(affiliations: any[], year: number): boolean {
+  const recent = affiliations.filter((x: any) =>
+    (x.years ?? []).some((y: number) => y >= year - 3),
+  );
+  const countries = new Set(recent.map((x: any) => x.institution?.country_code).filter(Boolean));
+  const schools = new Set(
+    recent
+      .filter((x: any) => x.institution?.type === "education")
+      .map((x: any) => x.institution?.id),
+  );
+  return countries.size >= 3 || schools.size >= 5;
 }
 
 /** Publication counts for companies, used to tell a small venture from a large employer. */
@@ -293,6 +301,8 @@ export type TopWork = {
   companyCoauthors: string[];
   /** Where this paper lists the person themselves. */
   ownInstitutions: { id: string; name: string }[];
+  /** True when the person is the first or last author: a paper they led. */
+  led: boolean;
 };
 
 /** A coauthor on a 35-author consortium paper is not a working relationship. */
@@ -330,6 +340,11 @@ export async function topRecentWorks(authorId: string): Promise<TopWork[]> {
         .filter((au: any) => shortId(au.author?.id) === authorId)
         .flatMap((au: any) => au.institutions ?? [])
         .map((i: any) => ({ id: shortId(i.id), name: i.display_name ?? "" })),
+      led: (w.authorships ?? []).some(
+        (au: any) =>
+          shortId(au.author?.id) === authorId &&
+          (au.author_position === "first" || au.author_position === "last"),
+      ),
     };
   });
 }
