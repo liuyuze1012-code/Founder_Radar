@@ -156,6 +156,8 @@ export const getReport = createServerFn({ method: "GET" })
       .eq("id", data.scanId)
       .maybeSingle();
     if (!scan) return null;
+    const { reportTitle } = await import("./report-title.server");
+    const title = await reportTitle(scan.theses?.text ?? "Report");
     const { data: picks } = await db
       .from("picks")
       .select(PICK_SELECT)
@@ -196,6 +198,7 @@ export const getReport = createServerFn({ method: "GET" })
     }
     return {
       scan,
+      title,
       summaryError,
       picks: (picks ?? []).map((pick) => ({
         ...pick,

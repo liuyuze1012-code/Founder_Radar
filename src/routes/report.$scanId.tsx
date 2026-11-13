@@ -14,7 +14,7 @@ export const Route = createFileRoute("/report/$scanId")({
   loader: async ({ context, params }) => {
     const d = await context.queryClient.ensureQueryData(reportQuery(params.scanId));
     if (!d) throw notFound();
-    return { thesis: (d.scan.theses as { text?: string } | null)?.text ?? "Report" };
+    return { thesis: d.title };
   },
   head: ({ loaderData }) => ({
     meta: [
@@ -88,9 +88,9 @@ function Report() {
         <ArrowLeft className="size-4" /> Dashboard
       </Link>
       <div className="mb-10 mt-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0 max-w-full lg:max-w-3xl">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Report</p>
-          <h1 className="mt-2 text-4xl font-semibold tracking-tight">{thesis?.text}</h1>
+          <h1 className="mt-2 break-words text-4xl font-semibold tracking-tight">{data.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
             {when && (
               <span>

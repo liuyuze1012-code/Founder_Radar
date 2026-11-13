@@ -36,3 +36,4 @@ use the editor.
 - Pages read from the database only, never hardcoded data; the sample scan is flagged `is_sample = true` and shows a banner.
 - Report card summaries are presentation-only: derive ideas from linked items.summary (paper/grant abstracts or repository README), use cases.product only as fallback, and qualifications from picks.why; validate seven- or eight-word rewrites, cache by source content, fall back to saved source titles on rewrite failure, and never alter sourcing, scoring, or saved startup cases.
 - Researcher score evidence uses native details/summary disclosures to stay collapsed by default without a newly optimized React dependency that can conflict with already-open preview sessions.
+- Report titles are presentation-only rewrites cached by full prompt; short prompts stay unchanged, and saved thesis text remains the input for repeat scans.
