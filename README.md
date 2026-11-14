@@ -4,7 +4,7 @@
 
 Founder Radar turns a VC's investment thesis into a weekly shortlist of researchers and builders worth knowing, including people who haven't decided to start a company yet. Type *"AI for drug discovery"*, pick a region, and it scans recent papers, grants and code from that region's universities. It then returns about 10 people, sorted into three lanes, with every claim linked to a public source.
 
-Built for the Georgetown × Lovable Hackathon. Sister project: [**Unicorn Radar**](https://github.com/liuyuze1012-code/Unicorn_Radar) judges companies once they've raised a Series A. Founder Radar finds the people *before* there is a company.
+🏆 **Our entry for the GUX × Lovable Hackathon, built to take first place.** Sister project: [**Unicorn Radar**](https://github.com/liuyuze1012-code/Unicorn_Radar) judges companies once they've raised a Series A. Founder Radar finds the people *before* there is a company.
 
 ---
 
@@ -53,20 +53,34 @@ Every score is deterministic and auditable: the AI never decides who makes the l
 - Feedback loop: 👍/👎 and promotions train the ranking to a fund's own taste.
 - Hand-off to [Unicorn Radar](https://github.com/liuyuze1012-code/Unicorn_Radar): when a tracked founder raises a Series A, score the company against 5,819 historical startups.
 
-## Run it locally
+## Run it yourself: you need your own API keys
+
+Founder Radar reads papers with AI and stores results in a database, so **running a scan requires your own keys.** Ours are not in this repo and never will be. Every scan costs AI credits (a few dozen model calls).
+
+| What | Required? | Environment variable | Where to get it |
+|---|---|---|---|
+| AI model | **Yes** | `LOVABLE_API_KEY` | Created automatically by Lovable Cloud. Or edit `src/lib/ai.server.ts` to call Anthropic directly with your own key. The app uses Claude Haiku (small) and Claude Sonnet (large). |
+| Database | **Yes** | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | A free [Supabase](https://supabase.com) project. Run the schema in `drizzle/migrations/`. The service-role key stays server-side only. |
+| Scan passcode | **Yes** | `SCAN_PASSCODE` | Any password you choose. It stops strangers from spending your AI credits by starting scans. |
+| GitHub token | Optional | `GITHUB_TOKEN` | Raises GitHub's rate limit (60 → 5,000 requests/hour). [Create one](https://github.com/settings/tokens) with no scopes. |
+| OpenAlex key | Optional | `OPENALEX_KEY` | Higher OpenAlex limits. Works without one. |
+
+NSF Award Search needs no key.
+
+**Easiest path:** open the project in [Lovable](https://lovable.dev) and remix it. Lovable Cloud sets up the database and AI key for you, and you only add `SCAN_PASSCODE` in the project's secrets.
+
+**Manual path:**
 
 ```bash
 git clone https://github.com/liuyuze1012-code/founder-radar-setup.git
 cd founder-radar-setup
 bun install        # or: npm install
+# Put the keys above in .env (browser-safe values) and your server environment (secrets)
 bun run dev
-bun run test
+bun run test       # scoring and routing tests; these need no keys
 ```
 
-The pipeline needs a backend:
-- **Database:** Supabase (Lovable Cloud). The schema lives in `drizzle/migrations/`. Point `.env` at your own project and set `SUPABASE_SERVICE_ROLE_KEY` as a server-side secret. It is never shipped to the browser.
-- **AI:** calls go through the Lovable AI gateway (`src/lib/ai.server.ts`) to Claude Haiku (small model) and Claude Sonnet (large model). Swap the base URL and key to use your own provider.
-- **Public data APIs:** OpenAlex, NSF Award Search and GitHub need no key for light use.
+Without keys you can still browse the UI and run the tests, but scans won't start.
 
 ## Project structure
 
@@ -91,4 +105,4 @@ Founder Radar only reads **public** professional records: papers, grants and cod
 Code: [MIT](LICENSE). Data comes from OpenAlex (CC0), NSF Award Search (public domain) and the GitHub API (subject to GitHub's terms).
 
 ## Team
-Built by Gavin (Yuze) Liu at Georgetown University, with Claude and Lovable. Issues and PRs are welcome.
+Built by **Gavin (Yuze) Liu** and **Leon Yan** at Georgetown University for the GUX × Lovable Hackathon, with Claude and Lovable. Issues and PRs are welcome.
