@@ -4,7 +4,7 @@
 
 Founder Radar turns a VC's investment thesis into a weekly shortlist of researchers and builders worth knowing, including people who haven't decided to start a company yet. Type *"AI for drug discovery"*, pick a region, and it scans recent papers, grants and code from that region's universities. It then returns about 10 people, sorted into three lanes, with every claim linked to a public source.
 
-🏆 **Our entry for the GUX × Lovable Hackathon, built to take first place.** Sister project: [**Unicorn Radar**](https://github.com/liuyuze1012-code/Unicorn_Radar) judges companies once they've raised a Series A. Founder Radar finds the people *before* there is a company.
+🏆 **Winner (1st Place), GUX × Lovable Hackathon 2026 (Georgetown University).** Sister project: [**Unicorn Radar**](https://github.com/liuyuze1012-code/Unicorn_Radar) judges companies once they've raised a Series A. Founder Radar finds the people *before* there is a company.
 
 ---
 
@@ -105,4 +105,4 @@ Founder Radar only reads **public** professional records: papers, grants and cod
 Code: [MIT](LICENSE). Data comes from OpenAlex (CC0), NSF Award Search (public domain) and the GitHub API (subject to GitHub's terms).
 
 ## Team
-Built by **Gavin (Yuze) Liu** and **Leon Yan** at Georgetown University for the GUX × Lovable Hackathon, with Claude and Lovable. Issues and PRs are welcome.
+Built by **Gavin (Yuze) Liu** and **Leon Yan** at Georgetown University, winners of the GUX × Lovable Hackathon 2026, with Claude and Lovable. Issues and PRs are welcome.
