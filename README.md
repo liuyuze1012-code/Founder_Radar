@@ -72,8 +72,8 @@ NSF Award Search needs no key.
 **Manual path:**
 
 ```bash
-git clone https://github.com/liuyuze1012-code/founder-radar-setup.git
-cd founder-radar-setup
+git clone https://github.com/liuyuze1012-code/Founder_Radar.git
+cd Founder_Radar
 bun install        # or: npm install
 # Put the keys above in .env (browser-safe values) and your server environment (secrets)
 bun run dev
